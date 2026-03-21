@@ -1,15 +1,17 @@
-// Input validation middleware for Express routes
-// Usage: validate(schema) where schema is a Joi validation schema
-// Returns 400 if validation fails
-
 const Joi = require('joi');
 
-module.exports = function (schema) {
-  return (req, res, next) => {
-    const { error } = schema.validate(req.body);
-    if (error) {
-      return res.status(400).json({ success: false, message: error.details[0].message });
-    }
-    next();
-  };
+const validate = (schema) => {
+    return (req, res, next) => {
+        const { error, value } = schema.validate(req.body, { abortEarly: false, stripUnknown: true });
+
+        if (error) {
+            const messages = error.details.map((x) => x.message).join(', ');
+            return res.status(400).json({ success: false, message: `Validation Error: ${messages}` });
+        }
+
+        req.body = value;
+        next();
+    };
 };
+
+module.exports = validate;

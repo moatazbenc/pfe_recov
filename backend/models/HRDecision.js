@@ -1,54 +1,55 @@
-// HRDecision model for HR system
-// Each decision is linked to a user and made by HR
-// Enforces: Only HR can create/update, decisionType is enum, date is required
-
 const mongoose = require('mongoose');
 
-const DECISION_TYPES = [
-  'bonus',
-  'training',
-  'promotion',
-  'mobility',
-  'termination'
-];
-
-const hrDecisionSchema = new mongoose.Schema({
+const HRDecisionSchema = new mongoose.Schema({
   user: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
     required: true
   },
-  decisionType: {
-    type: String,
-    enum: DECISION_TYPES,
-    required: true
-  },
-  reason: {
-    type: String,
-    required: true,
-    trim: true
-  },
-  date: {
-    type: Date,
-    required: true
-  },
-  createdBy: {
+  cycle: {
     type: mongoose.Schema.Types.ObjectId,
-    ref: 'User', // Must be HR
+    ref: 'Cycle',
     required: true
+  },
+  individualScore: {
+    type: Number,
+    default: 0
+  },
+  teamScore: {
+    type: Number,
+    default: 0
+  },
+  finalScore: {
+    type: Number,
+    required: true
+  },
+  action: {
+    type: String,
+    enum: ['reward', 'promotion', 'bonus', 'satisfactory', 'coaching', 'training', 'position_change', 'termination_review'],
+    required: true
+  },
+  actionLabel: {
+    type: String,
+    default: ''
+  },
+  decidedBy: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User'
+  },
+  decidedAt: {
+    type: Date,
+    default: Date.now
+  },
+  notes: {
+    type: String,
+    default: ''
+  },
+  createdAt: {
+    type: Date,
+    default: Date.now
   }
-}, {
-  timestamps: true
 });
 
-// Enforce only HR can create/update decisions
-hrDecisionSchema.pre('validate', async function(next) {
-  const User = mongoose.model('User');
-  const creator = await User.findById(this.createdBy);
-  if (!creator || creator.role !== 'HR') {
-    return next(new Error('Only HR can create or update HR decisions.'));
-  }
-  next();
-});
+HRDecisionSchema.index({ user: 1, cycle: 1 }, { unique: true });
 
-module.exports = mongoose.model('HRDecision', hrDecisionSchema);
+module.exports = mongoose.model('HRDecision', HRDecisionSchema);

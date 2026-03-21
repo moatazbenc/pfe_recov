@@ -11,73 +11,73 @@ exports.createTeam = async (req, res) => {
 
     // Basic validation
     if (!name || !name.trim()) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Team name is required.' 
+      return res.status(400).json({
+        success: false,
+        message: 'Team name is required.'
       });
     }
 
     if (!manager) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Manager is required.' 
+      return res.status(400).json({
+        success: false,
+        message: 'Manager is required.'
       });
     }
 
     // Validate manager exists and has correct role
     const managerUser = await User.findById(manager);
     if (!managerUser) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Manager not found.' 
+      return res.status(400).json({
+        success: false,
+        message: 'Manager not found.'
       });
     }
-    if (managerUser.role !== 'Manager') {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Selected user must have Manager role.' 
+    if (managerUser.role !== 'TEAM_LEADER' && managerUser.role !== 'ADMIN' && managerUser.role !== 'HR') {
+      return res.status(400).json({
+        success: false,
+        message: 'Selected user must have TEAM_LEADER, ADMIN, or HR role.'
       });
     }
 
     // Check if manager already manages another team
     const existingTeam = await Team.findOne({ manager });
     if (existingTeam) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'This manager already manages another team.' 
+      return res.status(409).json({
+        success: false,
+        message: 'This manager already manages another team.'
       });
     }
 
     // Validate collaborators if provided
     if (collaborators && collaborators.length > 0) {
-      const users = await User.find({ 
-        _id: { $in: collaborators }, 
-        role: 'Collaborator' 
+      const users = await User.find({
+        _id: { $in: collaborators },
+        role: 'COLLABORATOR'
       });
       if (users.length !== collaborators.length) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'All collaborators must be valid users with role Collaborator.' 
+        return res.status(400).json({
+          success: false,
+          message: 'All collaborators must be valid users with the COLLABORATOR role.'
         });
       }
     }
 
     // Check for duplicate team name
-    const duplicateName = await Team.findOne({ 
-      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') } 
+    const duplicateName = await Team.findOne({
+      name: { $regex: new RegExp(`^${name.trim()}$`, 'i') }
     });
     if (duplicateName) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'A team with this name already exists.' 
+      return res.status(409).json({
+        success: false,
+        message: 'A team with this name already exists.'
       });
     }
 
     // Create the team
-    const team = await Team.create({ 
-      name: name.trim(), 
-      manager, 
-      collaborators: collaborators || [] 
+    const team = await Team.create({
+      name: name.trim(),
+      manager,
+      collaborators: collaborators || []
     });
 
     // Populate and return
@@ -89,15 +89,15 @@ exports.createTeam = async (req, res) => {
 
   } catch (err) {
     console.error('Create team error:', err);
-    
+
     // Handle duplicate key error
     if (err.code === 11000) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'A team with this name already exists.' 
+      return res.status(409).json({
+        success: false,
+        message: 'A team with this name already exists.'
       });
     }
-    
+
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -106,17 +106,17 @@ exports.createTeam = async (req, res) => {
 exports.getTeams = async (req, res) => {
   try {
     let filter = {};
-    
+
     // Managers can only see their own team
-    if (req.user.role === 'Manager') {
+    if (req.user.role === 'TEAM_LEADER') {
       filter.manager = req.user.id || req.user._id;
     }
-    
+
     const teams = await Team.find(filter)
       .populate('manager', 'name email')
       .populate('collaborators', 'name email')
       .sort({ name: 1 });
-      
+
     res.json({ success: true, teams });
   } catch (err) {
     console.error('Get teams error:', err);
@@ -130,26 +130,26 @@ exports.getTeamById = async (req, res) => {
     const team = await Team.findById(req.params.id)
       .populate('manager', 'name email')
       .populate('collaborators', 'name email');
-      
+
     if (!team) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Team not found.' 
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found.'
       });
     }
 
     // Authorization check
     const userId = req.user.id || req.user._id;
-    const isHR = req.user.role === 'HR' || req.user.role === 'Admin';
+    const isHR = req.user.role === 'HR' || req.user.role === 'ADMIN';
     const isManager = team.manager._id.toString() === userId.toString();
     const isCollaborator = team.collaborators.some(
       (c) => c._id.toString() === userId.toString()
     );
 
     if (!isHR && !isManager && !isCollaborator) {
-      return res.status(403).json({ 
-        success: false, 
-        message: 'Access denied.' 
+      return res.status(403).json({
+        success: false,
+        message: 'Access denied.'
       });
     }
 
@@ -164,36 +164,36 @@ exports.getTeamById = async (req, res) => {
 exports.updateTeam = async (req, res) => {
   try {
     const { name, manager, collaborators } = req.body;
-    
+
     const team = await Team.findById(req.params.id);
     if (!team) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Team not found.' 
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found.'
       });
     }
 
     // Validate name if provided
     if (name !== undefined) {
       if (!name.trim()) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Team name cannot be empty.' 
+        return res.status(400).json({
+          success: false,
+          message: 'Team name cannot be empty.'
         });
       }
-      
+
       // Check for duplicate name (excluding current team)
-      const duplicateName = await Team.findOne({ 
+      const duplicateName = await Team.findOne({
         name: { $regex: new RegExp(`^${name.trim()}$`, 'i') },
         _id: { $ne: team._id }
       });
       if (duplicateName) {
-        return res.status(409).json({ 
-          success: false, 
-          message: 'A team with this name already exists.' 
+        return res.status(409).json({
+          success: false,
+          message: 'A team with this name already exists.'
         });
       }
-      
+
       team.name = name.trim();
     }
 
@@ -201,27 +201,27 @@ exports.updateTeam = async (req, res) => {
     if (manager && manager !== team.manager.toString()) {
       const managerUser = await User.findById(manager);
       if (!managerUser) {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Manager not found.' 
+        return res.status(400).json({
+          success: false,
+          message: 'Manager not found.'
         });
       }
-      if (managerUser.role !== 'Manager') {
-        return res.status(400).json({ 
-          success: false, 
-          message: 'Selected user must have Manager role.' 
+      if (managerUser.role !== 'TEAM_LEADER' && managerUser.role !== 'ADMIN' && managerUser.role !== 'HR') {
+        return res.status(400).json({
+          success: false,
+          message: 'Selected user must have TEAM_LEADER, ADMIN, or HR role.'
         });
       }
 
       // Check if new manager already manages another team
-      const existingTeam = await Team.findOne({ 
-        manager, 
-        _id: { $ne: team._id } 
+      const existingTeam = await Team.findOne({
+        manager,
+        _id: { $ne: team._id }
       });
       if (existingTeam) {
-        return res.status(409).json({ 
-          success: false, 
-          message: 'This manager already manages another team.' 
+        return res.status(409).json({
+          success: false,
+          message: 'This manager already manages another team.'
         });
       }
 
@@ -231,14 +231,14 @@ exports.updateTeam = async (req, res) => {
     // Validate and update collaborators if provided
     if (collaborators !== undefined) {
       if (collaborators.length > 0) {
-        const users = await User.find({ 
-          _id: { $in: collaborators }, 
-          role: 'Collaborator' 
+        const users = await User.find({
+          _id: { $in: collaborators },
+          role: 'COLLABORATOR'
         });
         if (users.length !== collaborators.length) {
-          return res.status(400).json({ 
-            success: false, 
-            message: 'All collaborators must be valid users with role Collaborator.' 
+          return res.status(400).json({
+            success: false,
+            message: 'All collaborators must be valid users with the COLLABORATOR role.'
           });
         }
       }
@@ -256,14 +256,14 @@ exports.updateTeam = async (req, res) => {
 
   } catch (err) {
     console.error('Update team error:', err);
-    
+
     if (err.code === 11000) {
-      return res.status(409).json({ 
-        success: false, 
-        message: 'A team with this name already exists.' 
+      return res.status(409).json({
+        success: false,
+        message: 'A team with this name already exists.'
       });
     }
-    
+
     res.status(500).json({ success: false, message: err.message });
   }
 };
@@ -272,11 +272,11 @@ exports.updateTeam = async (req, res) => {
 exports.deleteTeam = async (req, res) => {
   try {
     const team = await Team.findById(req.params.id);
-    
+
     if (!team) {
-      return res.status(404).json({ 
-        success: false, 
-        message: 'Team not found.' 
+      return res.status(404).json({
+        success: false,
+        message: 'Team not found.'
       });
     }
 
@@ -297,7 +297,7 @@ exports.deleteTeam = async (req, res) => {
     */
 
     await Team.findByIdAndDelete(req.params.id);
-    
+
     res.json({ success: true, message: 'Team deleted successfully.' });
 
   } catch (err) {

@@ -1,104 +1,156 @@
-// src/components/AuthContext.jsx
-// Auth context for user authentication and role management
-// Provides user info and login/logout helpers to the app
-
-import React, {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-} from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
+import axios from 'axios';
 
 const AuthContext = createContext(null);
-
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 export function useAuth() {
   const context = useContext(AuthContext);
   if (!context) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    throw new Error('useAuth must be used within AuthProvider');
   }
   return context;
 }
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const [refreshToken, setRefreshToken] = useState(localStorage.getItem('refreshToken'));
   const [loading, setLoading] = useState(true);
+  const initialLoadDone = useRef(false);
 
-  // Fetch current user on mount
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
+  // Axios setup
   useEffect(() => {
-    const fetchCurrentUser = async () => {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        console.log('[Auth] No token found, user is not authenticated');
-        setLoading(false);
-        return;
-      }
+    if (token) {
+      axios.defaults.headers.common['Authorization'] = 'Bearer ' + token;
+    } else {
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  }, [token]);
 
-      console.log('[Auth] Token found, verifying with server...');
+  // Axios interceptor for 401 token refresh
+  useEffect(() => {
+    const interceptor = axios.interceptors.response.use(
+      (response) => response,
+      async (error) => {
+        const originalRequest = error.config;
 
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/auth/me`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-        });
+        if (error.response?.status === 401 && !originalRequest._retry) {
+          originalRequest._retry = true;
 
-        const text = await res.text();
-        const data = text ? JSON.parse(text) : null;
+          const storedRefreshToken = localStorage.getItem('refreshToken');
+          if (storedRefreshToken) {
+            try {
+              const res = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+                refreshToken: storedRefreshToken
+              });
 
-        console.log('[Auth] Server response:', res.status, data);
+              const newAccessToken = res.data.accessToken;
+              const newRefreshToken = res.data.refreshToken;
 
-        if (!res.ok || !data?.success) {
-          console.warn('[Auth] Token invalid or expired');
-          localStorage.removeItem('token');
-          setUser(null);
-        } else {
-          console.log('[Auth] User authenticated:', data.user?.name, 'Role:', data.user?.role);
-          setUser(data.user);
+              localStorage.setItem('token', newAccessToken);
+              localStorage.setItem('refreshToken', newRefreshToken);
+
+              setToken(newAccessToken);
+              setRefreshToken(newRefreshToken);
+
+              axios.defaults.headers.common['Authorization'] = 'Bearer ' + newAccessToken;
+              originalRequest.headers['Authorization'] = 'Bearer ' + newAccessToken;
+
+              return axios(originalRequest);
+            } catch (refreshErr) {
+              console.error('Token refresh failed:', refreshErr);
+              logout(); // Force logout if refresh fails
+            }
+          } else {
+            logout();
+          }
         }
-      } catch (err) {
-        console.error('[Auth] Error verifying token:', err);
-        localStorage.removeItem('token');
-        setUser(null);
-      } finally {
-        setLoading(false);
+        return Promise.reject(error);
       }
-    };
+    );
 
-    fetchCurrentUser();
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
   }, []);
 
-  // Login handler
-  const login = (userData, token) => {
-    console.log('[Auth] Login:', userData?.name, 'Role:', userData?.role);
-    localStorage.setItem('token', token);
-    setUser(userData);
-  };
+  // Load user ONCE on app start
+  useEffect(() => {
+    let isMounted = true;
+    async function loadUser() {
+      if (token && !initialLoadDone.current) {
+        try {
+          const res = await axios.get(API_BASE_URL + '/api/auth/me');
+          if (isMounted) {
+            setUser(res.data);
+            initialLoadDone.current = true;
+          }
+        } catch (err) {
+          console.error('Load user error:', err);
+        }
+      }
+      if (isMounted) {
+        setLoading(false);
+      }
+    }
+    loadUser();
+    return () => { isMounted = false; };
+  }, [token]);
 
-  // Logout handler
-  const logout = () => {
-    console.log('[Auth] Logout');
-    localStorage.removeItem('token');
-    setUser(null);
-  };
+  async function login(email, password) {
+    try {
+      const res = await axios.post(API_BASE_URL + '/api/auth/login', { email, password });
 
-  // Get current token
-  const getToken = () => {
-    return localStorage.getItem('token');
-  };
+      const newAccessToken = res.data.accessToken;
+      const newRefreshToken = res.data.refreshToken;
+      const userData = res.data.user;
 
-  const value = {
-    user,
-    loading,
-    login,
-    logout,
-    getToken,
-    isAuthenticated: !!user,
-  };
+      localStorage.setItem('token', newAccessToken);
+      localStorage.setItem('refreshToken', newRefreshToken);
+
+      setToken(newAccessToken);
+      setRefreshToken(newRefreshToken);
+      setUser(userData);
+
+      return { success: true };
+    } catch (err) {
+      console.error('Login error:', err);
+      const message = err.response?.data?.message || 'Login failed';
+      return { success: false, message };
+    }
+  }
+
+  async function logout() {
+    try {
+      const storedRefreshToken = localStorage.getItem('refreshToken');
+      if (storedRefreshToken) {
+        await axios.post(API_BASE_URL + '/api/auth/logout', {
+          refreshToken: storedRefreshToken
+        });
+      }
+    } catch (err) {
+      console.error('Logout error pinging backend:', err);
+    } finally {
+      localStorage.removeItem('token');
+      localStorage.removeItem('refreshToken');
+      setToken(null);
+      setRefreshToken(null);
+      setUser(null);
+      delete axios.defaults.headers.common['Authorization'];
+    }
+  }
+
+  const value = { user, token, loading, login, logout };
+
+  if (loading) {
+    return (
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', fontSize: '20px' }}>
+        Loading...
+      </div>
+    );
+  }
 
   return (
     <AuthContext.Provider value={value}>
@@ -106,3 +158,5 @@ export function AuthProvider({ children }) {
     </AuthContext.Provider>
   );
 }
+
+export default AuthContext;

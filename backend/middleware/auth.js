@@ -1,28 +1,21 @@
-// middleware/auth.js
 const jwt = require('jsonwebtoken');
 
-module.exports = (req, res, next) => {
-  const authHeader = req.headers.authorization; // 'Bearer token'
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res
-      .status(401)
-      .json({ success: false, message: 'No token, authorization denied' });
-  }
-
-  const token = authHeader.split(' ')[1];
-
+module.exports = function (req, res, next) {
   try {
-    const decoded = jwt.verify(
-      token,
-      process.env.JWT_SECRET || 'dev-secret'
-    );
-    req.user = decoded; // { id, role }
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return res.status(401).json({ message: 'No token provided' });
+    }
+
+    const token = authHeader.split(' ')[1];
+    const jwtSecret = process.env.JWT_SECRET || 'fallback_secret_key';
+    const decoded = jwt.verify(token, jwtSecret);
+
+    req.user = decoded;
     next();
   } catch (err) {
-    console.error('AUTH MIDDLEWARE ERROR:', err);
-    return res
-      .status(401)
-      .json({ success: false, message: 'Token is not valid' });
+    console.error('Auth error:', err);
+    return res.status(401).json({ message: 'Invalid token' });
   }
 };

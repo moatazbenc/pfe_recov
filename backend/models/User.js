@@ -1,39 +1,51 @@
-// models/User.js
+
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema(
-  {
-    name: { type: String, required: true, trim: true },
-    email: { type: String, required: true, unique: true, trim: true },
-    password: { type: String, required: true },
-    role: {
-      type: String,
-      enum: ['HR', 'Admin', 'Employee', 'Manager', 'Collaborator'],
-      required: true,
-    },
-    team: { type: String },
-    teamId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: 'Team',
-      default: null,
-    },
+const ROLES = ['ADMIN', 'HR', 'TEAM_LEADER', 'COLLABORATOR'];
+
+const userSchema = new mongoose.Schema({
+  name: { type: String, required: true, trim: true },
+  email: {
+    type: String,
+    required: true,
+    unique: true,
+    lowercase: true,
+    trim: true,
+    validate: {
+      validator: v => /^([\w.-]+)@biat\.com$/.test(v),
+      message: 'Email must end with @biat.com'
+    }
   },
-  { timestamps: true }
-);
+  password: { type: String, required: true, select: false },
+  role: {
+    type: String,
+    enum: ROLES,
+    required: true,
+    default: 'COLLABORATOR',
+    index: true
+  },
+  team: { type: mongoose.Schema.Types.ObjectId, ref: 'Team', default: null },
+  manager: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  isActive: { type: Boolean, default: true },
+  tenantId: { type: String, default: 'default', index: true },
+  refreshToken: { type: String, select: false },
+  isDeleted: { type: Boolean, default: false, index: true },
+}, { timestamps: true });
 
-// Hash password before save
-userSchema.pre('save', async function () {
-  // If password not changed, do nothing
-  if (!this.isModified('password')) return;
-
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+userSchema.pre('save', async function (next) {
+  if (!this.isModified('password')) return next();
+  try {
+    const salt = await bcrypt.genSalt(12);
+    this.password = await bcrypt.hash(this.password, salt);
+    next();
+  } catch (err) {
+    next(err);
+  }
 });
 
-// Compare entered password with hashed password
-userSchema.methods.matchPassword = function (enteredPassword) {
-  return bcrypt.compare(enteredPassword, this.password);
+userSchema.methods.comparePassword = async function (candidate) {
+  return bcrypt.compare(candidate, this.password);
 };
 
 module.exports = mongoose.model('User', userSchema);
