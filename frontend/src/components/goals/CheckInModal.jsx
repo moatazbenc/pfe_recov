@@ -1,0 +1,174 @@
+import React, { useState } from 'react';
+import axios from 'axios';
+import './CheckInModal.css';
+
+const API = 'http://localhost:5000';
+
+function CheckInModal({ goal, onClose, onCheckInComplete }) {
+    // Local state for KPI updates. Initialize with current values.
+    const [kpiUpdates, setKpiUpdates] = useState(
+        (goal.kpis || []).map(kpi => ({
+            _id: kpi._id,
+            title: kpi.title,
+            metricType: kpi.metricType,
+            initialValue: kpi.initialValue,
+            targetValue: kpi.targetValue,
+            currentValue: kpi.currentValue,
+            unit: kpi.unit
+        }))
+    );
+    const [status, setStatus] = useState(goal.goalStatus || 'no_status');
+    const [message, setMessage] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [isDrafting, setIsDrafting] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleKpiChange = (id, newCurrentValue) => {
+        setKpiUpdates(prev => prev.map(kpi => {
+            if (kpi._id === id) {
+                return { ...kpi, currentValue: parseFloat(newCurrentValue) || 0 };
+            }
+            return kpi;
+        }));
+    };
+
+    const handleAutoDraft = async () => {
+        setIsDrafting(true);
+        try {
+            const token = localStorage.getItem('token');
+            const res = await axios.post(`${API}/api/ai/draft-checkin`, {
+                goalTitle: goal.title,
+                oldKpis: goal.kpis,
+                newKpis: kpiUpdates,
+                newStatus: status
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            if (res.data.draft) {
+                setMessage(res.data.draft);
+            }
+        } catch (err) {
+            console.error('Failed to auto-draft', err);
+        } finally {
+            setIsDrafting(false);
+        }
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setIsSubmitting(true);
+        try {
+            const token = localStorage.getItem('token');
+            // Extract just what the backend needs
+            const payloadKpis = kpiUpdates.map(k => ({ _id: k._id, currentValue: k.currentValue }));
+            
+            await axios.post(`${API}/api/objectives/${goal._id}/progress`, {
+                message,
+                goalStatus: status,
+                kpiUpdates: payloadKpis
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            
+            onCheckInComplete(); // refresh parent
+        } catch (err) {
+            setError(err.response?.data?.message || 'Failed to submit check-in.');
+            setIsSubmitting(false);
+        }
+    };
+
+    return (
+        <div className="goal-modal-overlay" onClick={onClose}>
+            <div className="goal-modal" onClick={e => e.stopPropagation()}>
+                <div className="goal-modal__header">
+                    <h2>Update Progress</h2>
+                    <button className="goal-modal__close" onClick={onClose} type="button">✕</button>
+                </div>
+                {error && <div className="goal-modal__error">{error}</div>}
+                
+                <form className="goal-modal__form" onSubmit={handleSubmit}>
+                    
+                    {/* Status Update */}
+                    <div className="goal-modal__field">
+                        <label>Current Status</label>
+                        <select value={status} onChange={e => setStatus(e.target.value)} className="check-in-select">
+                            <option value="no_status">No Status</option>
+                            <option value="on_track">On Track</option>
+                            <option value="at_risk">At Risk</option>
+                            <option value="off_track">Off Track</option>
+                            <option value="completed">Completed</option>
+                        </select>
+                    </div>
+
+                    {/* KPI Sliders */}
+                    {kpiUpdates.length > 0 && (
+                        <div className="check-in-kpis">
+                            <label>Update Metrics</label>
+                            {kpiUpdates.map(kpi => {
+                                const range = kpi.targetValue - kpi.initialValue;
+                                const isPositiveDirection = range >= 0;
+                                const min = isPositiveDirection ? kpi.initialValue : kpi.targetValue;
+                                const max = isPositiveDirection ? kpi.targetValue : kpi.initialValue;
+                                
+                                return (
+                                    <div key={kpi._id} className="check-in-kpi-item">
+                                        <div className="check-in-kpi-header">
+                                            <span className="kpi-title">{kpi.title}</span>
+                                            <span className="kpi-values">
+                                                <input 
+                                                    type="number" 
+                                                    className="kpi-number-input"
+                                                    value={kpi.currentValue}
+                                                    onChange={e => handleKpiChange(kpi._id, e.target.value)}
+                                                />
+                                                <span className="kpi-target">/ {kpi.targetValue} {kpi.unit}</span>
+                                            </span>
+                                        </div>
+                                        {kpi.metricType !== 'boolean' && (
+                                            <input 
+                                                type="range" 
+                                                className="kpi-slider"
+                                                min={min} 
+                                                max={max} 
+                                                step={range !== 0 && Math.abs(range) <= 10 ? 0.1 : 1}
+                                                value={kpi.currentValue} 
+                                                onChange={e => handleKpiChange(kpi._id, e.target.value)}
+                                            />
+                                        )}
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
+
+                    {/* Narrative */}
+                    <div className="goal-modal__field">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <label>Progress Update</label>
+                            <button type="button" className="goal-modal__ai-btn" onClick={handleAutoDraft} disabled={isDrafting}>
+                                {isDrafting ? 'Drafting...' : '✨ Auto-Draft'}
+                            </button>
+                        </div>
+                        <textarea 
+                            rows={4} 
+                            placeholder="What progress have you made?" 
+                            value={message}
+                            onChange={e => setMessage(e.target.value)}
+                            required
+                        />
+                    </div>
+
+                    <div className="goal-modal__actions">
+                        <button type="button" className="goal-modal__cancel" onClick={onClose}>Cancel</button>
+                        <button type="submit" className="goal-modal__submit" disabled={isSubmitting}>
+                            {isSubmitting ? 'Checking-in...' : 'Submit Check-in'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+export default CheckInModal;

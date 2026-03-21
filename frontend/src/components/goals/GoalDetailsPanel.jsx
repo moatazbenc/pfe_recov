@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import axios from 'axios';
 import GoalProgressBar from './GoalProgressBar';
 import GoalStatusBadge from './GoalStatusBadge';
+import CheckInModal from './CheckInModal';
+import GoalAlignmentTree from './GoalAlignmentTree';
 import { useAuth } from '../AuthContext';
 
 var API = 'http://localhost:5000';
@@ -16,6 +18,7 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
     var [updateText, setUpdateText] = useState('');
     var [newStatus, setNewStatus] = useState(goal.goalStatus || 'no_status');
     var [children, setChildren] = useState([]);
+    var [showCheckInModal, setShowCheckInModal] = useState(false);
     // Local KPI values for debounced editing (Bug 2 fix)
     var [kpiLocalValues, setKpiLocalValues] = useState({});
     var debounceTimers = useRef({});
@@ -240,7 +243,7 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
     function formatDate(d) { return d ? new Date(d).toLocaleDateString() : '—'; }
     function formatDateTime(d) { return d ? new Date(d).toLocaleString() : '—'; }
 
-    var tabs = ['details', 'kpis', 'subgoals', 'updates', 'comments', 'settings'];
+    var tabs = ['details', 'kpis', 'alignment', 'updates', 'comments', 'settings'];
 
     return (
         <div className="goal-panel-overlay" onClick={onClose}>
@@ -253,8 +256,11 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
                     </div>
                     <p className="goal-panel__desc">{detail.description || 'No description'}</p>
                     <div className="goal-panel__progress-row">
-                        <GoalProgressBar percent={detail.achievementPercent || 0} />
+                        <div style={{ flex: 1 }}><GoalProgressBar percent={detail.achievementPercent || 0} /></div>
                         <GoalStatusBadge status={detail.goalStatus || 'no_status'} />
+                        <button className="submit-btn" style={{ padding: '6px 12px', fontSize: '0.85rem' }} onClick={function() { setShowCheckInModal(true); }}>
+                            Update Progress
+                        </button>
                     </div>
                 </div>
 
@@ -344,31 +350,19 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
                         </div>
                     )}
 
-                    {activeTab === 'subgoals' && (
-                        <div className="goal-panel__subgoals">
-                            <h3>Sub-Goals ({children.length})</h3>
-                            {children.length === 0 ? (
-                                <p className="goal-panel__empty">No sub-goals. Create a goal with this as parent to add sub-goals.</p>
-                            ) : (
-                                children.map(function (child) {
-                                    return (
-                                        <div key={child._id} className="goal-panel__subgoal-item">
-                                            <span>{child.title}</span>
-                                            <GoalProgressBar percent={child.achievementPercent || 0} size="small" />
-                                            <GoalStatusBadge status={child.goalStatus || 'no_status'} />
-                                        </div>
-                                    );
-                                })
-                            )}
+                    {activeTab === 'alignment' && (
+                        <div className="goal-panel__alignment">
+                            <h3 style={{ marginBottom: '4px' }}>Goal Alignment</h3>
+                            <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '16px' }}>See how this goal aligns upward to team goals and downward to sub-goals.</p>
+                            <GoalAlignmentTree rootGoal={detail} />
                         </div>
                     )}
 
                     {activeTab === 'updates' && (
                         <div className="goal-panel__updates">
-                            <h3>Progress Updates</h3>
-                            <div className="goal-panel__add-update">
-                                <textarea placeholder="Write a progress update..." value={updateText} onChange={function (e) { setUpdateText(e.target.value); }} rows={3}></textarea>
-                                <button onClick={handleAddUpdate} disabled={!updateText.trim()}>Post Update</button>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
+                                <h3 style={{ margin: 0 }}>Progress Updates (Check-ins)</h3>
+                                <button className="submit-btn" style={{ padding: '6px 14px', fontSize: '0.85rem' }} onClick={function() { setShowCheckInModal(true); }}>+ Check-in</button>
                             </div>
                             {(detail.progressUpdates || []).length === 0 ? (
                                 <p className="goal-panel__empty">No updates yet.</p>
@@ -433,6 +427,17 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
                     )}
                 </div>
             </div>
+            {showCheckInModal && (
+                <CheckInModal 
+                    goal={detail} 
+                    onClose={function() { setShowCheckInModal(false); }}
+                    onCheckInComplete={function() {
+                        setShowCheckInModal(false);
+                        fetchDetail();
+                        if (onRefresh) onRefresh();
+                    }}
+                />
+            )}
         </div>
     );
 }

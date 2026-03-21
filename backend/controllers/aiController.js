@@ -370,3 +370,54 @@ exports.assist = async (req, res) => {
         res.status(500).json({ message: 'AI assist failed' });
     }
 };
+
+function pickRandom(arr) {
+    if (!arr || !arr.length) return '';
+    return arr[Math.floor(Math.random() * arr.length)];
+}
+
+exports.draftCheckin = async (req, res) => {
+    try {
+        const { goalTitle, oldKpis, newKpis, newStatus } = req.body;
+        
+        let changes = [];
+        let positive = true;
+
+        if (oldKpis && newKpis) {
+            newKpis.forEach(newK => {
+                const oldK = oldKpis.find(k => String(k._id) === String(newK._id));
+                if (oldK && newK.currentValue !== undefined && oldK.currentValue != newK.currentValue) {
+                    const diff = parseFloat(newK.currentValue) - parseFloat(oldK.currentValue);
+                    if (diff < 0 && newK.metricType !== 'number') positive = false; 
+                    const diffText = diff > 0 ? `increased by ${diff}` : `decreased by ${Math.abs(diff)}`;
+                    changes.push(`'${newK.title || 'KPI'}' ${diffText} (now ${newK.currentValue})`);
+                }
+            });
+        }
+
+        const templates = positive ? [
+            "We've made solid progress this period. ",
+            "Continuing on a positive trajectory. ",
+            "Great momentum on this goal. "
+        ] : [
+            "Facing some headwinds this period. ",
+            "Progress has stalled slightly. ",
+            "We've encountered some challenges. "
+        ];
+
+        let draft = pickRandom(templates);
+        if (changes.length > 0) {
+            draft += "Specifically, " + changes.join(' and ') + ". ";
+        } else {
+            draft += "General updates and alignments have been made without direct metric changes. ";
+        }
+
+        if (newStatus && newStatus !== 'no_status') {
+            draft += `The overall objective status is currently marked as ${newStatus.replace('_', ' ')}.`;
+        }
+
+        res.json({ success: true, draft });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};

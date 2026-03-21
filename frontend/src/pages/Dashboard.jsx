@@ -113,9 +113,21 @@ function Dashboard() {
     return { goals: 'All Goals', teams: 'All Teams', users: 'All Users', cycles: 'All Cycles' };
   }
 
+  function getNeedsAttentionGoals() {
+    var objArr = Array.isArray(objectives) ? objectives : [];
+    var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
+    return objArr.filter(function (o) {
+      if (o.goalStatus === 'achieved' || o.goalStatus === 'closed') return false;
+      var lastUpdated = new Date(o.updatedAt || o.createdAt);
+      return lastUpdated < fourteenDaysAgo;
+    });
+  }
+
   var heatmap = getHeatmapData();
   var heatmapColors = { on_track: '#059669', at_risk: '#D97706', off_track: '#DC2626', achieved: '#7C3AED', no_status: '#9CA3AF', closed: '#6B7280' };
   var labels = getStatsLabels();
+
+  var staleGoals = getNeedsAttentionGoals();
 
   if (loading) {
     return (
@@ -173,6 +185,26 @@ function Dashboard() {
               return (
                 <div key={i} className={'dash-risk-item ' + severityClass}>
                   <span>{icon} {r.message}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* Action Center - Needs Attention */}
+      {staleGoals.length > 0 && (
+        <div className="dash-risk-alerts" style={{ background: '#FFFBEB', borderColor: '#FDE68A' }}>
+          <h3 className="dash-risk-alerts__title" style={{ color: '#92400E' }}>⚠️ Action Center: Needs Attention ({staleGoals.length})</h3>
+          <p style={{ fontSize: '0.85rem', color: '#B45309', margin: '0 0 12px 0' }}>These goals haven't had a check-in for over 14 days.</p>
+          <div className="dash-risk-alerts__list">
+            {staleGoals.slice(0, 5).map(function (g, i) {
+              return (
+                <div key={i} className="dash-risk-item" style={{ background: '#FEF3C7', color: '#92400E', borderLeft: '4px solid #F59E0B', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span>🎯 {g.title} <span style={{fontSize: '0.8rem', opacity: 0.8}}>(Last updated: {new Date(g.updatedAt||g.createdAt).toLocaleDateString()})</span></span>
+                  <button className="submit-btn" style={{ padding: '4px 10px', fontSize: '0.75rem', background: '#D97706' }} onClick={function() { window.location.href='/goals'; }}>
+                    {activeTab === 'me' ? 'Check-in Now' : 'View Goal'}
+                  </button>
                 </div>
               );
             })}

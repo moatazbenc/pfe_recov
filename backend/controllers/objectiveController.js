@@ -508,15 +508,50 @@ exports.deleteKpi = async (req, res) => {
   }
 };
 
-// Add progress update
+// Add progress update (Unified Check-In)
 exports.addProgressUpdate = async (req, res) => {
   try {
     const objective = await Objective.findById(req.params.id);
     if (!objective) return res.status(404).json({ success: false, message: 'Objective not found.' });
-    const { message } = req.body;
-    if (!message) return res.status(400).json({ success: false, message: 'Message is required.' });
+    
+    const { message, goalStatus, kpiUpdates } = req.body;
+    if (!message) return res.status(400).json({ success: false, message: 'Message is required for check-in.' });
+    
+    // 1. Update Goal Status
+    if (goalStatus) {
+      objective.goalStatus = goalStatus;
+    }
+
+    // 2. Update KPIs if provided
+    if (kpiUpdates && Array.isArray(kpiUpdates)) {
+      kpiUpdates.forEach(update => {
+        const kpi = objective.kpis.id(update._id);
+        if (kpi && update.currentValue !== undefined) {
+          kpi.currentValue = update.currentValue;
+          if (update.status) kpi.status = update.status;
+        }
+      });
+      // Recalculate progress
+      objective.achievementPercent = calculateKpiProgress(objective.kpis);
+      if (objective.achievementPercent !== null) {
+        objective.weightedScore = (objective.weight * objective.achievementPercent) / 100;
+      }
+    }
+
+    // 3. Save the narrative check-in
     objective.progressUpdates.push({ user: req.user.id, message });
     await objective.save();
+    
+    // Notification logic
+    const team = await Team.findOne({ members: objective.owner });
+    if (team && team.leader && String(req.user.id) === String(objective.owner)) {
+      const user = await User.findById(req.user.id);
+      await createNotification(team.leader, 'Check-in Submitted', `${user ? user.name : 'A team member'} submitted a check-in for "${objective.title}".`, `/evaluations`);
+    } else if (String(req.user.id) !== String(objective.owner)) {
+      const updater = await User.findById(req.user.id);
+      await createNotification(objective.owner, 'New Update on Objective', `${updater ? updater.name : 'Someone'} checked-in on your objective "${objective.title}".`, `/goals`);
+    }
+
     const updated = await Objective.findById(req.params.id).populate('progressUpdates.user', 'name email');
     res.json({ success: true, objective: updated });
   } catch (err) {
