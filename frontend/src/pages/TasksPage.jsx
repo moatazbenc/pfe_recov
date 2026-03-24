@@ -1,27 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
+import { useToast } from '../components/common/Toast';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
 
-var API = 'http://localhost:5000';
+var priorityColors = { low: '#6b7280', medium: '#3b82f6', high: '#f59e0b', urgent: '#ef4444' };
+var statusLabels = { todo: 'To Do', in_progress: 'In Progress', done: 'Done', cancelled: 'Cancelled' };
+var statusColors = { todo: '#6b7280', in_progress: '#3b82f6', done: '#10b981', cancelled: '#ef4444' };
 
 function TasksPage() {
   var { user } = useAuth();
+  var toast = useToast();
   var [tab, setTab] = useState('my');
   var [tasks, setTasks] = useState([]);
+  var [objectives, setObjectives] = useState([]);
   var [stats, setStats] = useState(null);
   var [loading, setLoading] = useState(true);
   var [showForm, setShowForm] = useState(false);
   var [editingTask, setEditingTask] = useState(null);
   var [users, setUsers] = useState([]);
-  var [form, setForm] = useState({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '', labels: '', linkedGoal: '' });
+  var [confirmDelete, setConfirmDelete] = useState(null);
+  var [form, setForm] = useState({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '', labels: '', linkedGoal: '', notes: '' });
   var [sending, setSending] = useState(false);
-
-  var token = localStorage.getItem('token');
-  var headers = { Authorization: 'Bearer ' + token };
-
-  var priorityColors = { low: '#6b7280', medium: '#3b82f6', high: '#f59e0b', urgent: '#ef4444' };
-  var statusLabels = { todo: 'To Do', in_progress: 'In Progress', done: 'Done', cancelled: 'Cancelled' };
-  var statusColors = { todo: '#6b7280', in_progress: '#3b82f6', done: '#10b981', cancelled: '#ef4444' };
 
   useEffect(function () { loadData(); }, [tab]);
 
@@ -29,36 +30,77 @@ function TasksPage() {
     setLoading(true);
     var url = tab === 'my' ? '/api/tasks/my' : tab === 'assigned' ? '/api/tasks/assigned' : '/api/tasks/all';
     Promise.all([
-      axios.get(API + url, { headers: headers }),
-      axios.get(API + '/api/tasks/stats', { headers: headers }),
-      axios.get(API + '/api/users', { headers: headers })
+      api.get(url),
+      api.get('/api/tasks/stats'),
+      api.get('/api/users'),
+      api.get('/api/objectives/my'),
     ]).then(function (res) {
       setTasks(res[0].data.tasks || []);
       setStats(res[1].data.stats || null);
       setUsers(Array.isArray(res[2].data) ? res[2].data : (res[2].data.users || []));
-    }).catch(function () {}).finally(function () { setLoading(false); });
+      setObjectives(Array.isArray(res[3].data) ? res[3].data : (res[3].data.objectives || []));
+    }).catch(function (err) {
+      toast.error('Failed to load tasks');
+    }).finally(function () { setLoading(false); });
   }
 
   function handleCreate() {
     if (!form.title.trim() || !form.assigneeId) return;
     setSending(true);
     var data = Object.assign({}, form, { labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }) : [] });
-    axios.post(API + '/api/tasks', data, { headers: headers })
-      .then(function () { setShowForm(false); resetForm(); loadData(); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); })
+    api.post('/api/tasks', data)
+      .then(function () { setShowForm(false); resetForm(); loadData(); toast.success('Task created!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error creating task'); })
+      .finally(function () { setSending(false); });
+  }
+
+  function handleEdit(task) {
+    setEditingTask(task._id);
+    setForm({
+      title: task.title,
+      description: task.description || '',
+      assigneeId: task.assignee?._id || '',
+      priority: task.priority || 'medium',
+      dueDate: task.dueDate ? task.dueDate.substring(0, 10) : '',
+      labels: (task.labels || []).join(', '),
+      linkedGoal: task.linkedGoal?._id || '',
+      notes: task.notes || '',
+    });
+    setShowForm(true);
+  }
+
+  function handleUpdate() {
+    if (!form.title.trim()) return;
+    setSending(true);
+    var data = Object.assign({}, form, { labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }) : [] });
+    api.put('/api/tasks/' + editingTask, data)
+      .then(function () { setShowForm(false); setEditingTask(null); resetForm(); loadData(); toast.success('Task updated!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error updating task'); })
       .finally(function () { setSending(false); });
   }
 
   function handleStatusChange(id, status) {
-    axios.put(API + '/api/tasks/' + id, { status: status }, { headers: headers }).then(function () { loadData(); });
+    api.put('/api/tasks/' + id, { status: status })
+      .then(function () { loadData(); if (status === 'done') toast.success('Task marked as done! 🎉'); })
+      .catch(function () { toast.error('Failed to update status'); });
   }
 
   function handleDelete(id) {
-    if (!confirm('Delete this task?')) return;
-    axios.delete(API + '/api/tasks/' + id, { headers: headers }).then(function () { loadData(); });
+    api.delete('/api/tasks/' + id)
+      .then(function () { loadData(); toast.success('Task deleted'); })
+      .catch(function () { toast.error('Failed to delete task'); });
+    setConfirmDelete(null);
   }
 
-  function resetForm() { setForm({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '', labels: '', linkedGoal: '' }); }
+  function resetForm() {
+    setEditingTask(null);
+    setForm({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '', labels: '', linkedGoal: '', notes: '' });
+  }
+
+  function cancelForm() {
+    setShowForm(false);
+    resetForm();
+  }
 
   var tabs = [{ key: 'my', label: 'My Tasks' }, { key: 'assigned', label: 'Assigned by Me' }];
   if (user.role === 'ADMIN' || user.role === 'HR') tabs.push({ key: 'all', label: 'All Tasks' });
@@ -70,7 +112,9 @@ function TasksPage() {
           <h1 className="page-title">✅ Tasks</h1>
           <p className="page-subtitle">Manage and track your tasks</p>
         </div>
-        <button className="btn btn--primary" onClick={function () { setShowForm(!showForm); }}>{showForm ? 'Cancel' : '+ New Task'}</button>
+        <button className="btn btn--primary" onClick={function () { setShowForm(!showForm); if (showForm) resetForm(); }}>
+          {showForm ? 'Cancel' : '+ New Task'}
+        </button>
       </div>
 
       {stats && (
@@ -86,10 +130,10 @@ function TasksPage() {
 
       {showForm && (
         <div className="form-card">
-          <h3 className="form-card__title">Create Task</h3>
+          <h3 className="form-card__title">{editingTask ? 'Edit Task' : 'Create Task'}</h3>
           <div className="form-grid">
             <div className="form-group form-group--full">
-              <label>Title</label>
+              <label>Title *</label>
               <input className="form-input" placeholder="Task title..." value={form.title} onChange={function (e) { setForm(Object.assign({}, form, { title: e.target.value })); }} />
             </div>
             <div className="form-group form-group--full">
@@ -97,7 +141,7 @@ function TasksPage() {
               <textarea className="form-textarea" rows={2} placeholder="Description..." value={form.description} onChange={function (e) { setForm(Object.assign({}, form, { description: e.target.value })); }} />
             </div>
             <div className="form-group">
-              <label>Assign To</label>
+              <label>Assign To *</label>
               <select className="form-select" value={form.assigneeId} onChange={function (e) { setForm(Object.assign({}, form, { assigneeId: e.target.value })); }}>
                 <option value="">Select person...</option>
                 {users.map(function (u) { return <option key={u._id} value={u._id}>{u.name}</option>; })}
@@ -117,13 +161,22 @@ function TasksPage() {
               <input type="date" className="form-input" value={form.dueDate} onChange={function (e) { setForm(Object.assign({}, form, { dueDate: e.target.value })); }} />
             </div>
             <div className="form-group">
+              <label>Linked Goal</label>
+              <select className="form-select" value={form.linkedGoal} onChange={function (e) { setForm(Object.assign({}, form, { linkedGoal: e.target.value })); }}>
+                <option value="">No linked goal</option>
+                {objectives.map(function (o) { return <option key={o._id} value={o._id}>{o.title}</option>; })}
+              </select>
+            </div>
+            <div className="form-group">
               <label>Labels (comma-separated)</label>
               <input className="form-input" placeholder="e.g. urgent, review" value={form.labels} onChange={function (e) { setForm(Object.assign({}, form, { labels: e.target.value })); }} />
             </div>
           </div>
           <div className="form-actions">
-            <button className="btn btn--secondary" onClick={function () { setShowForm(false); resetForm(); }}>Cancel</button>
-            <button className="btn btn--primary" onClick={handleCreate} disabled={sending || !form.title.trim() || !form.assigneeId}>{sending ? 'Creating...' : 'Create Task'}</button>
+            <button className="btn btn--secondary" onClick={cancelForm}>Cancel</button>
+            <button className="btn btn--primary" onClick={editingTask ? handleUpdate : handleCreate} disabled={sending || !form.title.trim() || !form.assigneeId}>
+              {sending ? (editingTask ? 'Saving...' : 'Creating...') : (editingTask ? 'Save Changes' : 'Create Task')}
+            </button>
           </div>
         </div>
       )}
@@ -133,9 +186,14 @@ function TasksPage() {
       </div>
 
       {loading ? (
-        <div className="loading-state"><div className="spinner"></div><p>Loading tasks...</p></div>
+        <LoadingSkeleton rows={4} height={80} />
       ) : tasks.length === 0 ? (
-        <div className="empty-state"><div className="empty-state__icon">✅</div><h3>No tasks yet</h3><p>Create a task to get started!</p></div>
+        <div className="empty-state">
+          <div className="empty-state__icon">✅</div>
+          <h3>No tasks yet</h3>
+          <p>{tab === 'my' ? "You're all caught up!" : 'No tasks found.'}</p>
+          <button className="btn btn--primary" onClick={function () { setShowForm(true); }}>+ Create Task</button>
+        </div>
       ) : (
         <div className="task-list">
           {tasks.map(function (t) {
@@ -143,7 +201,7 @@ function TasksPage() {
             return (
               <div key={t._id} className={'task-item' + (isOverdue ? ' task-item--overdue' : '')}>
                 <div className="task-item__left">
-                  <span className="task-item__status-dot" style={{ background: statusColors[t.status] }}></span>
+                  <span className="task-item__status-dot" style={{ background: statusColors[t.status] }} />
                   <div className="task-item__info">
                     <span className="task-item__title">{t.title}</span>
                     {t.description && <p className="task-item__desc">{t.description}</p>}
@@ -151,8 +209,8 @@ function TasksPage() {
                       <span className="status-chip" style={{ background: priorityColors[t.priority] + '18', color: priorityColors[t.priority] }}>{t.priority}</span>
                       {t.assignee && <span className="meta-tag">👤 {t.assignee.name}</span>}
                       {t.dueDate && <span className={'meta-tag' + (isOverdue ? ' meta-tag--danger' : '')}>{isOverdue ? '⚠️' : '📅'} {new Date(t.dueDate).toLocaleDateString()}</span>}
-                      {t.labels && t.labels.map(function (l) { return <span key={l} className="meta-tag">{l}</span>; })}
                       {t.linkedGoal && <span className="meta-tag">🎯 {t.linkedGoal.title || 'Goal'}</span>}
+                      {(t.labels || []).map(function (l) { return <span key={l} className="meta-tag">{l}</span>; })}
                     </div>
                   </div>
                 </div>
@@ -160,13 +218,24 @@ function TasksPage() {
                   <select className="form-select form-select--sm" value={t.status} onChange={function (e) { handleStatusChange(t._id, e.target.value); }}>
                     {Object.entries(statusLabels).map(function (entry) { return <option key={entry[0]} value={entry[0]}>{entry[1]}</option>; })}
                   </select>
-                  <button className="btn btn--ghost btn--sm" onClick={function () { handleDelete(t._id); }}>🗑️</button>
+                  <button className="btn btn--ghost btn--sm" onClick={function () { handleEdit(t); }}>✏️</button>
+                  <button className="btn btn--ghost btn--sm" style={{ color: '#ef4444' }} onClick={function () { setConfirmDelete(t._id); }}>🗑️</button>
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Task?"
+        message="This action cannot be undone."
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={function () { handleDelete(confirmDelete); }}
+        onCancel={function () { setConfirmDelete(null); }}
+      />
     </div>
   );
 }

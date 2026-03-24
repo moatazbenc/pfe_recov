@@ -11,7 +11,7 @@ const path = require('path');
 const app = express();
 
 // Security middlewares
-app.use(helmet());
+app.use(helmet({ crossOriginResourcePolicy: false }));
 app.use(cors({ 
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173', 
   credentials: true 
@@ -36,6 +36,7 @@ const routes = {
   '/api/objectives': './routes/objectives',
   '/api/hr-decisions': './routes/hrDecisions',
   '/api/notifications': './routes/notifications',
+  '/api/feed': './routes/feed',
   '/api/stats': './routes/stats',
   '/api/audit-logs': './routes/auditLog',
   '/api/meetings': './routes/meetings',

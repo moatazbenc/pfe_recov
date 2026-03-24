@@ -6,7 +6,7 @@ function pickRandom(arr) {
 }
 
 function pickMultiple(arr, count) {
-    var shuffled = arr.slice().sort(function() { return Math.random() - 0.5; });
+    var shuffled = arr.slice().sort(function () { return Math.random() - 0.5; });
     return shuffled.slice(0, Math.min(count, shuffled.length));
 }
 
@@ -199,9 +199,9 @@ exports.summarizePerformance = async (req, res) => {
         // Build contextual insights from actual data
         var contextParts = [];
         if (objectives && objectives.length > 0) {
-            var completed = objectives.filter(function(o) { return o.goalStatus === 'achieved' || o.achievementPercent >= 100; }).length;
-            var atRisk = objectives.filter(function(o) { return o.goalStatus === 'at_risk' || o.goalStatus === 'off_track'; }).length;
-            var avgProgress = objectives.reduce(function(sum, o) { return sum + (o.achievementPercent || 0); }, 0) / objectives.length;
+            var completed = objectives.filter(function (o) { return o.goalStatus === 'achieved' || o.achievementPercent >= 100; }).length;
+            var atRisk = objectives.filter(function (o) { return o.goalStatus === 'at_risk' || o.goalStatus === 'off_track'; }).length;
+            var avgProgress = objectives.reduce(function (sum, o) { return sum + (o.achievementPercent || 0); }, 0) / objectives.length;
 
             if (completed > 0) contextParts.push(completed + ' out of ' + objCount + ' objectives have been achieved.');
             if (atRisk > 0) contextParts.push(atRisk + ' objective(s) are flagged as at-risk and need attention.');
@@ -323,12 +323,12 @@ exports.assist = async (req, res) => {
         const { action, context } = req.body;
 
         var actions = {
-            'summarize-feedback': function() {
+            'summarize-feedback': function () {
                 var feedbacks = context?.feedbacks || [];
                 var count = feedbacks.length;
                 var types = {};
-                feedbacks.forEach(function(f) { types[f.type] = (types[f.type] || 0) + 1; });
-                var typeStr = Object.entries(types).map(function(e) { return e[1] + ' ' + e[0]; }).join(', ');
+                feedbacks.forEach(function (f) { types[f.type] = (types[f.type] || 0) + 1; });
+                var typeStr = Object.entries(types).map(function (e) { return e[1] + ' ' + e[0]; }).join(', ');
 
                 var templates = [
                     `Analysis of ${count} feedback items (${typeStr || 'various types'}) reveals a pattern of ${pickRandom(['constructive engagement', 'proactive communication', 'collaborative spirit', 'action-oriented discussion'])}. ${pickRandom(['Key themes include team collaboration and goal alignment.', 'Notable focus areas are skill development and performance improvement.', 'Recurring themes highlight communication effectiveness and initiative.'])}`,
@@ -336,7 +336,7 @@ exports.assist = async (req, res) => {
                 ];
                 return pickRandom(templates);
             },
-            'write-update': function() {
+            'write-update': function () {
                 var goalTitle = context?.goalTitle || 'the objective';
                 var progress = context?.progress || 0;
                 var templates = [
@@ -346,11 +346,11 @@ exports.assist = async (req, res) => {
                 ];
                 return pickRandom(templates);
             },
-            'review-prep': function() {
+            'review-prep': function () {
                 var objectives = context?.objectives || [];
                 var count = objectives.length;
-                var completed = objectives.filter(function(o) { return (o.achievementPercent || 0) >= 100; }).length;
-                var avgProgress = count > 0 ? Math.round(objectives.reduce(function(s, o) { return s + (o.achievementPercent || 0); }, 0) / count) : 0;
+                var completed = objectives.filter(function (o) { return (o.achievementPercent || 0) >= 100; }).length;
+                var avgProgress = count > 0 ? Math.round(objectives.reduce(function (s, o) { return s + (o.achievementPercent || 0); }, 0) / count) : 0;
 
                 return `Review preparation summary: ${count} objectives tracked with ${completed} completed and ${avgProgress}% average progress. ${pickRandom([
                     'Recommended discussion points: KPI tracking methodology, resource allocation, and timeline adjustments.',
@@ -379,7 +379,7 @@ function pickRandom(arr) {
 exports.draftCheckin = async (req, res) => {
     try {
         const { goalTitle, oldKpis, newKpis, newStatus } = req.body;
-        
+
         let changes = [];
         let positive = true;
 
@@ -388,7 +388,7 @@ exports.draftCheckin = async (req, res) => {
                 const oldK = oldKpis.find(k => String(k._id) === String(newK._id));
                 if (oldK && newK.currentValue !== undefined && oldK.currentValue != newK.currentValue) {
                     const diff = parseFloat(newK.currentValue) - parseFloat(oldK.currentValue);
-                    if (diff < 0 && newK.metricType !== 'number') positive = false; 
+                    if (diff < 0 && newK.metricType !== 'number') positive = false;
                     const diffText = diff > 0 ? `increased by ${diff}` : `decreased by ${Math.abs(diff)}`;
                     changes.push(`'${newK.title || 'KPI'}' ${diffText} (now ${newK.currentValue})`);
                 }

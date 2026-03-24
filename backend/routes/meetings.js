@@ -3,6 +3,7 @@ const router = express.Router();
 const Meeting = require('../models/Meeting');
 const auth = require('../middleware/auth');
 const rateLimiter = require('../middleware/rateLimiter');
+const { createNotification } = require('../controllers/notificationController');
 
 // Get all meetings for current user (as organizer or attendee)
 router.get('/', rateLimiter, auth, async function (req, res) {
@@ -67,18 +68,23 @@ router.post('/', rateLimiter, auth, async function (req, res) {
             return res.status(400).json({ success: false, message: 'Title and date are required' });
         }
 
+        // Sanitize team: empty string is not a valid ObjectId
+        var sanitizedTeam = (team && team.length > 0) ? team : null;
+        // Filter out any empty strings from attendees
+        var sanitizedAttendees = (attendees || []).filter(function (a) { return a && a.length > 0; });
+
         var meeting = await Meeting.create({
             title,
             description: description || '',
             organizer: req.user.id,
-            attendees: attendees || [],
+            attendees: sanitizedAttendees,
             date,
             startTime: startTime || '09:00',
             endTime: endTime || '10:00',
             type: type || 'team',
             agenda: agenda || [],
             relatedObjectives: relatedObjectives || [],
-            team: team || null,
+            team: sanitizedTeam,
             recurring: recurring || 'none',
             location: location || '',
         });
@@ -87,6 +93,20 @@ router.post('/', rateLimiter, auth, async function (req, res) {
             .populate('organizer', 'name email role')
             .populate('attendees', 'name email role')
             .populate('team', 'name');
+
+        if (populated.attendees && populated.attendees.length > 0) {
+            for (const attendee of populated.attendees) {
+                if (String(attendee._id) !== String(req.user.id)) {
+                    await createNotification(
+                        attendee._id,
+                        'New Meeting Scheduled',
+                        `You have been invited to a new meeting: "${title}" by ${populated.organizer.name}.`,
+                        '/meetings',
+                        'MEETING_INVITE'
+                    );
+                }
+            }
+        }
 
         res.status(201).json({ success: true, meeting: populated });
     } catch (err) {
@@ -106,7 +126,13 @@ router.put('/:id', rateLimiter, auth, async function (req, res) {
         var fields = ['title', 'description', 'attendees', 'date', 'startTime', 'endTime', 'type', 'status', 'agenda', 'notes', 'relatedObjectives', 'team', 'recurring', 'location', 'actionItems'];
         fields.forEach(function (field) {
             if (req.body[field] !== undefined) {
-                meeting[field] = req.body[field];
+                if (field === 'team') {
+                    meeting[field] = (req.body[field] && req.body[field].length > 0) ? req.body[field] : null;
+                } else if (field === 'attendees') {
+                    meeting[field] = (req.body[field] || []).filter(function (a) { return a && a.length > 0; });
+                } else {
+                    meeting[field] = req.body[field];
+                }
             }
         });
 
@@ -117,6 +143,23 @@ router.put('/:id', rateLimiter, auth, async function (req, res) {
             .populate('attendees', 'name email role')
             .populate('team', 'name')
             .populate('relatedObjectives', 'title goalStatus');
+
+        if (populated.attendees && populated.attendees.length > 0) {
+            for (const attendee of populated.attendees) {
+                if (String(attendee._id) !== String(req.user.id)) {
+                    const msg = req.body.status === 'cancelled'
+                        ? `Meeting "${meeting.title}" has been cancelled.`
+                        : `Meeting details updated for "${meeting.title}".`;
+                    await createNotification(
+                        attendee._id,
+                        req.body.status === 'cancelled' ? 'Meeting Cancelled' : 'Meeting Updated',
+                        msg,
+                        '/meetings',
+                        'MEETING_UPDATE'
+                    );
+                }
+            }
+        }
 
         res.json({ success: true, meeting: populated });
     } catch (err) {

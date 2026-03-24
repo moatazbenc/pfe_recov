@@ -59,7 +59,8 @@ router.post('/login', async function (req, res) {
         id: user._id, // compatibility
         name: user.name,
         email: user.email,
-        role: user.role
+        role: user.role,
+        profileImage: user.profileImage
       }
     });
   } catch (err) {
@@ -155,7 +156,8 @@ router.get('/me', async function (req, res) {
       id: user._id, // compatibility
       name: user.name,
       email: user.email,
-      role: user.role
+      role: user.role,
+      profileImage: user.profileImage
     });
   } catch (err) {
     if (err.name === 'TokenExpiredError') {

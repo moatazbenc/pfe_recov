@@ -7,6 +7,26 @@ const ownership = require('../middleware/ownership');
 const rateLimiter = require('../middleware/rateLimiter');
 const validate = require('../middleware/validate');
 const schemas = require('../validators/schemas');
+const multer = require('multer');
+const path = require('path');
+
+const storage = multer.diskStorage({
+  destination: function (req, file, cb) {
+    cb(null, 'uploads/avatars/');
+  },
+  filename: function (req, file, cb) {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, req.user.id + '-' + uniqueSuffix + path.extname(file.originalname));
+  }
+});
+const upload = multer({ 
+  storage: storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB limit
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype.startsWith('image/')) cb(null, true);
+    else cb(new Error('Not an image! Please upload an image.'), false);
+  }
+});
 
 // Get all users (admin only)
 router.get('/', rateLimiter, auth, role('ADMIN'), async (req, res) => {
@@ -95,6 +115,31 @@ router.delete('/:id', rateLimiter, auth, role('ADMIN'), async function (req, res
   } catch (err) {
     console.error('Delete user error:', err);
     res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Upload or Update Avatar
+router.put('/:id/avatar', rateLimiter, auth, upload.single('avatar'), async (req, res) => {
+  try {
+    if (req.user.id !== req.params.id && req.user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Not authorized to update this avatar' });
+    }
+    if (!req.file) {
+      return res.status(400).json({ message: 'No image provided' });
+    }
+    
+    const imageUrl = `/uploads/avatars/${req.file.filename}`;
+    
+    const user = await User.findByIdAndUpdate(
+      req.params.id, 
+      { profileImage: imageUrl }, 
+      { new: true }
+    ).select('-password').populate('team', 'name');
+    
+    res.json(user);
+  } catch (err) {
+    console.error('Avatar upload error:', err);
+    res.status(500).json({ message: err.message || 'Server error during upload' });
   }
 });
 

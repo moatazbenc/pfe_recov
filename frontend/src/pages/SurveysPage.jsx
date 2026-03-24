@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
-
-var API = 'http://localhost:5000';
+import { useToast } from '../components/common/Toast';
+import ConfirmDialog from '../components/common/ConfirmDialog';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
 
 function SurveysPage() {
   var { user } = useAuth();
@@ -17,8 +18,8 @@ function SurveysPage() {
   var [results, setResults] = useState(null);
   var [sending, setSending] = useState(false);
 
-  var token = localStorage.getItem('token');
-  var headers = { Authorization: 'Bearer ' + token };
+  var toast = useToast();
+  var [confirmDelete, setConfirmDelete] = useState(null);
   var isAdmin = user.role === 'ADMIN' || user.role === 'HR' || user.role === 'TEAM_LEADER';
 
   useEffect(function () { loadData(); }, [tab]);
@@ -26,9 +27,9 @@ function SurveysPage() {
   function loadData() {
     setLoading(true);
     var url = tab === 'active' ? '/api/surveys/active' : '/api/surveys/all';
-    axios.get(API + url, { headers: headers })
+    api.get(url)
       .then(function (res) { setSurveys(res.data.surveys || []); })
-      .catch(function () {})
+      .catch(function () { toast.error('Failed to load surveys'); })
       .finally(function () { setLoading(false); });
   }
 
@@ -51,13 +52,13 @@ function SurveysPage() {
   function handleCreate() {
     if (!form.title.trim() || !form.questions.length || !form.questions[0].text) return;
     setSending(true);
-    axios.post(API + '/api/surveys', form, { headers: headers })
+    api.post('/api/surveys', form)
       .then(function (res) {
         var surveyId = res.data.survey._id;
-        return axios.put(API + '/api/surveys/' + surveyId + '/publish', {}, { headers: headers });
+        return api.put('/api/surveys/' + surveyId + '/publish', {});
       })
-      .then(function () { setShowCreate(false); setForm({ title: '', description: '', anonymous: false, type: 'survey', questions: [{ text: '', type: 'rating', options: [], required: true }] }); loadData(); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); })
+      .then(function () { setShowCreate(false); setForm({ title: '', description: '', anonymous: false, type: 'survey', questions: [{ text: '', type: 'rating', options: [], required: true }] }); loadData(); toast.success('Survey created and published!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error creating survey'); })
       .finally(function () { setSending(false); });
   }
 
@@ -69,21 +70,23 @@ function SurveysPage() {
   function handleRespond() {
     var formatted = answers.map(function (val, i) { return { questionIndex: i, value: val }; });
     setSending(true);
-    axios.post(API + '/api/surveys/' + showRespond._id + '/respond', { answers: formatted }, { headers: headers })
-      .then(function () { setShowRespond(null); loadData(); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); })
+    api.post('/api/surveys/' + showRespond._id + '/respond', { answers: formatted })
+      .then(function () { setShowRespond(null); loadData(); toast.success('Response submitted!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error submitting response'); })
       .finally(function () { setSending(false); });
   }
 
   function openResults(surveyId) {
-    axios.get(API + '/api/surveys/' + surveyId + '/results', { headers: headers })
+    api.get('/api/surveys/' + surveyId + '/results')
       .then(function (res) { setResults(res.data); setShowResults(surveyId); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); });
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error loading results'); });
   }
 
   function handleDelete(id) {
-    if (!confirm('Delete this survey?')) return;
-    axios.delete(API + '/api/surveys/' + id, { headers: headers }).then(function () { loadData(); });
+    api.delete('/api/surveys/' + id)
+      .then(function () { loadData(); toast.success('Survey deleted'); })
+      .catch(function () { toast.error('Failed to delete survey'); });
+    setConfirmDelete(null);
   }
 
   return (
@@ -214,7 +217,7 @@ function SurveysPage() {
       </div>
 
       {loading ? (
-        <div className="loading-state"><div className="spinner"></div><p>Loading surveys...</p></div>
+        <LoadingSkeleton rows={3} height={90} />
       ) : surveys.length === 0 ? (
         <div className="empty-state"><div className="empty-state__icon">📊</div><h3>No surveys yet</h3><p>{isAdmin ? 'Create a survey to get started!' : 'No active surveys to respond to.'}</p></div>
       ) : (
@@ -238,13 +241,23 @@ function SurveysPage() {
                   {s.status === 'active' && !s.hasResponded && <button className="btn btn--primary btn--sm" onClick={function () { openRespond(s); }}>Respond</button>}
                   {s.status === 'active' && s.hasResponded && <span className="status-chip" style={{ background: '#10b98118', color: '#10b981' }}>✓ Responded</span>}
                   {isAdmin && <button className="btn btn--secondary btn--sm" onClick={function () { openResults(s._id); }}>Results</button>}
-                  {isAdmin && <button className="btn btn--ghost btn--sm" onClick={function () { handleDelete(s._id); }}>🗑️</button>}
+                  {isAdmin && <button className="btn btn--ghost btn--sm" style={{ color: '#ef4444' }} onClick={function () { setConfirmDelete(s._id); }}>🗑️</button>}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!confirmDelete}
+        title="Delete Survey?"
+        message="All responses will be permanently lost."
+        confirmLabel="Delete"
+        danger={true}
+        onConfirm={function () { handleDelete(confirmDelete); }}
+        onCancel={function () { setConfirmDelete(null); }}
+      />
     </div>
   );
 }

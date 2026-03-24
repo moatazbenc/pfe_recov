@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../components/AuthContext';
+import { useTheme } from '../components/ThemeContext';
 
 function Login() {
+  const { darkMode, toggleDarkMode } = useTheme();
   const [formData, setFormData] = useState({
     email: '',
     password: ''
@@ -50,6 +52,26 @@ function Login() {
 
   return (
     <div className="auth-page">
+      <button 
+        onClick={toggleDarkMode} 
+        style={{
+          position: 'absolute',
+          top: '20px',
+          right: '20px',
+          padding: '8px 16px',
+          borderRadius: '20px',
+          border: '1px solid var(--border-color)',
+          background: 'var(--bg-card)',
+          color: 'var(--text-dark)',
+          cursor: 'pointer',
+          zIndex: 10,
+          boxShadow: 'var(--shadow-sm)',
+          fontFamily: 'var(--font-retro)',
+          fontSize: '0.9rem'
+        }}
+      >
+        {darkMode ? '☀️ Normal Mode' : '🌙 Retro Dark Mode'}
+      </button>
       <div className="auth-card">
         <div className="auth-header">
           <div className="auth-logo">🏢</div>

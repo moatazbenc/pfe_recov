@@ -31,6 +31,42 @@ const AttachmentSchema = new mongoose.Schema({
   uploadedAt: { type: Date, default: Date.now },
 });
 
+// Change Request Schema for active goals
+const ChangeRequestSchema = new mongoose.Schema({
+  requestType: {
+    type: String,
+    enum: ['due_date_extension', 'scope_change', 'pause', 'cancellation'],
+    required: true,
+  },
+  requestedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  reason: { type: String, required: true },
+  // For due date extension
+  newDeadline: { type: Date, default: null },
+  // For scope change
+  newDescription: { type: String, default: '' },
+  newTitle: { type: String, default: '' },
+  // Resolution
+  status: {
+    type: String,
+    enum: ['pending', 'approved', 'rejected', 'modified'],
+    default: 'pending',
+  },
+  resolvedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  resolvedAt: { type: Date, default: null },
+  resolutionNote: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+}, { _id: true, timestamps: true });
+
+// Activity log for tracking all events on the goal
+const ActivityLogSchema = new mongoose.Schema({
+  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  action: { type: String, required: true }, // e.g. 'created', 'submitted', 'approved', 'rejected', etc.
+  details: { type: String, default: '' },
+  fromStatus: { type: String, default: '' },
+  toStatus: { type: String, default: '' },
+  createdAt: { type: Date, default: Date.now },
+});
+
 const ObjectiveSchema = new mongoose.Schema({
   title: { type: String, required: true, trim: true },
   description: { type: String, default: '' },
@@ -45,39 +81,86 @@ const ObjectiveSchema = new mongoose.Schema({
   managerAdjustedPercent: { type: Number, min: 0, max: 100, default: null },
   managerComments: { type: String, default: '' },
   weightedScore: { type: Number, default: null },
+
+  // === WORKFLOW STATUS (approval lifecycle) ===
   status: {
     type: String,
-    enum: ['draft', 'submitted', 'validated', 'locked'],
+    enum: [
+      'draft',              // employee is drafting
+      'pending',            // employee submitted to team leader, awaiting review
+      'submitted',          // employee submitted for approval (legacy, maps to pending_approval)
+      'pending_approval',   // awaiting manager approval
+      'revision_requested', // manager requested revision
+      'rejected',           // manager rejected
+      'assigned',           // manager assigned to employee, pending acknowledgment
+      'acknowledged',       // employee acknowledged manager-assigned goal
+      'approved',           // manager approved - goal is active
+      'validated',          // legacy: manager validated (kept for backward compat)
+      'locked',             // locked - no edits
+      'cancelled',          // cancelled
+      'evaluated',          // completion evaluated by manager
+      'archived',           // archived
+    ],
     default: 'draft',
-    index: true
+    index: true,
   },
+
+  // === GOAL SOURCE ===
+  source: {
+    type: String,
+    enum: ['employee_created', 'manager_assigned'],
+    default: 'employee_created',
+  },
+  assignedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+  // === SUBMISSION TRACKING ===
+  submittedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+
+  // === REJECTION / REVISION DETAILS ===
+  rejectionReason: { type: String, default: '' },
+  revisionReason: { type: String, default: '' },
+
+  // === EVALUATION ===
+  evaluationRating: {
+    type: String,
+    enum: ['exceeded', 'met', 'partially_met', 'not_met', ''],
+    default: '',
+  },
+  evaluationComment: { type: String, default: '' },
+  evaluatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
+  evaluatedAt: { type: Date, default: null },
+
   validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   validatedAt: { type: Date, default: null },
 
-  // === NEW GOAL FIELDS ===
+  // === EXECUTION STATUS (goalStatus) ===
   goalStatus: {
     type: String,
-    enum: ['no_status', 'on_track', 'at_risk', 'off_track', 'closed', 'achieved'],
+    enum: ['no_status', 'not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'on_hold', 'closed', 'achieved'],
     default: 'no_status',
-    index: true
+    index: true,
   },
+
   startDate: { type: Date, default: null },
   labels: [{ type: String, trim: true }],
   visibility: {
     type: String,
     enum: ['private', 'team', 'department', 'public'],
-    default: 'public'
+    default: 'public',
   },
   parentObjective: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Objective',
     default: null,
-    index: true
+    index: true,
   },
   kpis: [KpiSchema],
   progressUpdates: [ProgressUpdateSchema],
   comments: [CommentSchema],
   attachments: [AttachmentSchema],
+  changeRequests: [ChangeRequestSchema],
+  activityLog: [ActivityLogSchema],
 
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
@@ -95,5 +178,6 @@ ObjectiveSchema.index({ owner: 1, cycle: 1 });
 ObjectiveSchema.index({ status: 1 });
 ObjectiveSchema.index({ category: 1 });
 ObjectiveSchema.index({ goalStatus: 1 });
+ObjectiveSchema.index({ source: 1 });
 
 module.exports = mongoose.model('Objective', ObjectiveSchema);

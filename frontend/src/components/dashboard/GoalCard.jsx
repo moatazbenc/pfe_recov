@@ -1,5 +1,6 @@
 import React from 'react';
 import ProgressDonut from './ProgressDonut';
+import UserAvatar from '../UserAvatar';
 
 function GoalCard({ objectives, loading }) {
     if (loading) {
@@ -23,17 +24,22 @@ function GoalCard({ objectives, loading }) {
         : 0;
 
     function getStatusInfo(obj) {
-        const pct = obj.achievementPercent || 0;
-        if (obj.status === 'validated' || obj.status === 'locked') return { label: 'Closed', color: '#6B7280' };
-        if (pct >= 70) return { label: 'On Track', color: '#10B981' };
-        if (pct >= 40) return { label: 'At Risk', color: '#F59E0B' };
-        return { label: 'Off Track', color: '#EF4444' };
+        const status = obj.goalStatus || 'no_status';
+        if (status === 'on_track') return { label: 'On Track', color: '#10B981', bg: 'rgba(16, 185, 129, 0.1)' };
+        if (status === 'at_risk') return { label: 'At Risk', color: '#F59E0B', bg: 'rgba(245, 158, 11, 0.1)' };
+        if (status === 'off_track') return { label: 'Behind', color: '#EF4444', bg: 'rgba(239, 68, 68, 0.1)' };
+        if (status === 'achieved') return { label: 'Achieved', color: '#7C3AED', bg: 'rgba(124, 58, 237, 0.1)' };
+        return { label: 'No Status', color: '#6B7280', bg: 'rgba(107, 114, 128, 0.1)' };
     }
 
-    const statusCounts = { 'On Track': 0, 'At Risk': 0, 'Off Track': 0, 'Closed': 0 };
+    const statusCounts = { 'On Track': 0, 'At Risk': 0, 'Off Track': 0, 'Achieved': 0, 'No Status': 0 };
     activeGoals.forEach(g => {
         const info = getStatusInfo(g);
-        statusCounts[info.label]++;
+        if (statusCounts[info.label] !== undefined) {
+            statusCounts[info.label]++;
+        } else {
+            statusCounts[info.label] = 1;
+        }
     });
 
     return (
@@ -46,32 +52,38 @@ function GoalCard({ objectives, loading }) {
             <div className="dash-card__body dash-card__body--split">
                 <div className="dash-card__list">
                     {activeGoals.length === 0 ? (
-                        <p className="dash-card__empty">No active goals yet. Create your first objective!</p>
+                        <p className="dash-card__empty">No goals matching this filter.</p>
                     ) : (
-                        activeGoals.slice(0, 5).map(obj => {
+                        activeGoals.slice(0, 6).map(obj => {
                             const statusInfo = getStatusInfo(obj);
+                            const commentCount = (obj.comments || []).length;
                             return (
-                                <div key={obj._id} className="goal-item">
-                                    <div className="goal-item__info">
-                                        <span className="goal-item__title">{obj.title}</span>
-                                        <div className="goal-item__meta">
-                                            <span className="goal-item__weight">{obj.weight}%</span>
-                                            <span className="goal-item__status" style={{ color: statusInfo.color }}>
-                                                ● {statusInfo.label}
-                                            </span>
+                                <div key={obj._id} className="goal-item" style={{ padding: '1rem', borderBottom: '1px solid var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flex: 1 }}>
+                                        <UserAvatar user={obj.owner} size={32} />
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span style={{ fontWeight: '600', fontSize: '0.9rem' }}>{obj.title}</span>
+                                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                                <span>📅 {new Date(obj.deadline || obj.createdAt).toLocaleDateString()}</span>
+                                                {commentCount > 0 && <span>💬 {commentCount}</span>}
+                                                <span style={{ 
+                                                    padding: '2px 8px', 
+                                                    borderRadius: '10px', 
+                                                    background: statusInfo.bg, 
+                                                    color: statusInfo.color,
+                                                    fontWeight: '700',
+                                                    fontSize: '0.7rem'
+                                                }}>
+                                                    {statusInfo.label}
+                                                </span>
+                                            </div>
                                         </div>
                                     </div>
-                                    <div className="goal-item__progress">
-                                        <div className="goal-item__bar">
-                                            <div
-                                                className="goal-item__bar-fill"
-                                                style={{
-                                                    width: (obj.achievementPercent || 0) + '%',
-                                                    backgroundColor: statusInfo.color,
-                                                }}
-                                            />
+                                    <div style={{ width: '80px', textAlign: 'right' }}>
+                                        <div style={{ fontWeight: 'bold', fontSize: '0.9rem' }}>{obj.achievementPercent || 0}%</div>
+                                        <div className="progress-bar-bg" style={{ height: '4px', background: 'var(--bg-main)', borderRadius: '2px', marginTop: '4px' }}>
+                                            <div style={{ height: '100%', width: `${obj.achievementPercent || 0}%`, background: statusInfo.color, borderRadius: '2px' }} />
                                         </div>
-                                        <span className="goal-item__pct">{obj.achievementPercent || 0}%</span>
                                     </div>
                                 </div>
                             );

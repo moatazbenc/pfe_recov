@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
+import { useTheme } from './ThemeContext';
+import UserAvatar from './UserAvatar';
 
 function Sidebar() {
     const [collapsed, setCollapsed] = useState(false);
     const location = useLocation();
     const { user } = useAuth();
+    const { darkMode, toggleDarkMode } = useTheme();
 
     if (!user) return null;
 
@@ -18,6 +21,8 @@ function Sidebar() {
             label: 'Main',
             items: [
                 { path: '/dashboard', label: 'Home', icon: '🏠', roles: null },
+                { path: '/feed', label: 'Feed', icon: '📡', roles: null },
+                // AI Assistant removed — feature removed
                 { path: '/goals', label: 'Goals', icon: '🎯', roles: null },
                 { path: '/tasks', label: 'Tasks', icon: '✅', roles: null },
                 { path: '/meetings', label: 'Meetings', icon: '📅', roles: null },
@@ -26,6 +31,7 @@ function Sidebar() {
         {
             label: 'People',
             items: [
+                { path: '/my-team', label: 'My Team', icon: '👥', roles: null },
                 { path: '/feedback', label: 'Feedback', icon: '💬', roles: null },
                 { path: '/recognition', label: 'Recognition', icon: '🏆', roles: null },
                 { path: '/reviews', label: 'Reviews', icon: '📋', roles: null },
@@ -37,7 +43,8 @@ function Sidebar() {
             items: [
                 { path: '/career', label: 'Career', icon: '🚀', roles: null },
                 { path: '/evaluations', label: 'Evaluations', icon: '📝', roles: null },
-                { path: '/cycles', label: 'Cycles', icon: '🔄', roles: null },
+                // Cycles only for privileged roles — collaborators don't need to manage cycles
+                { path: '/cycles', label: 'Cycles', icon: '🔄', roles: ['ADMIN', 'HR', 'TEAM_LEADER'] },
             ],
         },
         {
@@ -45,7 +52,8 @@ function Sidebar() {
             items: [
                 { path: '/validation', label: 'Validation', icon: '✔️', roles: ['ADMIN', 'TEAM_LEADER'] },
                 { path: '/hr-decisions', label: 'HR Decisions', icon: '⚖️', roles: ['ADMIN', 'TEAM_LEADER', 'HR'] },
-                { path: '/teams', label: 'Teams', icon: '👥', roles: null },
+                // Teams hidden from COLLABORATORs — principle of least privilege
+                { path: '/teams', label: 'Teams', icon: '👥', roles: ['ADMIN', 'HR', 'TEAM_LEADER'] },
                 { path: '/users', label: 'Users', icon: '👤', roles: ['ADMIN', 'HR'] },
                 { path: '/analytics', label: 'Analytics', icon: '📈', roles: ['ADMIN', 'HR', 'TEAM_LEADER'] },
                 { path: '/settings', label: 'Settings', icon: '⚙️', roles: null },
@@ -101,13 +109,36 @@ function Sidebar() {
 
             {/* User section */}
             <div className="sidebar__user">
-                <div className="sidebar__avatar">{initials}</div>
+                <UserAvatar user={user} size={36} />
                 {!collapsed && (
                     <div className="sidebar__user-info">
                         <span className="sidebar__user-name">{user.name}</span>
                         <span className="sidebar__user-role">{user.role}</span>
                     </div>
                 )}
+            </div>
+
+            {/* Theme Toggle */}
+            <div className="sidebar__theme-toggle" style={{ padding: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start' }}>
+                <button 
+                    onClick={toggleDarkMode}
+                    style={{ 
+                        background: darkMode ? '#FFCB05' : '#f1f5f9', 
+                        color: darkMode ? '#000' : '#64748b',
+                        border: 'none',
+                        padding: '6px 12px',
+                        borderRadius: '20px',
+                        cursor: 'pointer',
+                        fontSize: '0.8rem',
+                        fontWeight: 'bold',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px'
+                    }}
+                >
+                    <span>{darkMode ? '🌙' : '☀️'}</span>
+                    {!collapsed && <span>{darkMode ? 'Retro Mode' : 'Light Mode'}</span>}
+                </button>
             </div>
         </aside>
     );

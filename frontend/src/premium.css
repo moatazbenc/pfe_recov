@@ -2,7 +2,7 @@
    TEAMFLECT-INSPIRED PREMIUM MODERNIZATION (PHASE 7)
    ======================================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=VT323&display=swap');
 
 :root {
   --primary: #4F46E5;
@@ -26,6 +26,48 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-retro: 'VT323', monospace;
+}
+
+/* ========== Dark Mode (Retro Pokémon) ========== */
+body.dark-mode {
+  --primary: #FFCB05; /* Pikachu Yellow */
+  --primary-hover: #E6B800;
+  --primary-light: rgba(255, 203, 5, 0.1);
+  --secondary: #EE1515; /* Pokeball Red */
+  --secondary-hover: #CC1212;
+  --bg-main: #0B0E14;
+  --bg-card: #161B22;
+  --text-dark: #F0F6FC;
+  --text-muted: #8B949E;
+  --text-light: #484F58;
+  --border-color: #30363D;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.6);
+}
+
+body.dark-mode h1, 
+body.dark-mode h2, 
+body.dark-mode h3, 
+body.dark-mode .sidebar__brand-text,
+body.dark-mode .dash-stat__value {
+  font-family: var(--font-retro) !important;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+body.dark-mode .sidebar {
+  background: #0D1117 !important;
+}
+
+body.dark-mode .dash-card, 
+body.dark-mode .goal-panel, 
+body.dark-mode .goal-item,
+body.dark-mode .goals-table {
+  background: var(--bg-card) !important;
+  border-width: 2px !important;
+  image-rendering: pixelated;
 }
 
 body {
@@ -38,34 +80,57 @@ body {
 
 /* ========== Sidebar ========== */
 .sidebar {
-  background: linear-gradient(180deg, #0f172a 0%, #1e293b 100%) !important;
-  border-right: none !important;
-  box-shadow: 4px 0 12px rgba(0, 0, 0, 0.15);
+  background: #ffffff !important;
+  border-right: 1px solid var(--border-color) !important;
+  box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03) !important;
 }
-.sidebar h2 {
-  color: #fff !important;
-  font-weight: 800;
-  font-size: 1.4rem;
+.sidebar__brand-text {
+  color: var(--text-dark) !important;
+  font-weight: 800 !important;
+  font-size: 1.4rem !important;
   letter-spacing: -0.5px;
 }
-.sidebar ul li a {
+.sidebar__toggle {
+  color: var(--text-muted) !important;
+  background: #f1f5f9 !important;
+  border-radius: 4px;
+}
+.sidebar__section-label {
+  color: var(--text-light) !important;
+  font-weight: 700 !important;
+  text-transform: uppercase;
+  font-size: 0.75rem !important;
+  letter-spacing: 0.05em;
+  padding: 8px 16px;
+  margin-top: 10px;
+}
+.sidebar__link {
   border-radius: 8px !important;
-  margin: 3px 10px !important;
-  color: #94a3b8 !important;
-  transition: all 0.2s ease;
-  font-weight: 500;
-  font-size: 0.9rem;
+  margin: 2px 12px !important;
+  color: var(--text-muted) !important;
+  transition: all 0.2s ease !important;
+  font-weight: 500 !important;
+  font-size: 0.95rem !important;
   padding: 10px 14px !important;
+  border: none !important;
 }
-.sidebar ul li a:hover,
-.sidebar ul li.active a {
-  background-color: rgba(79, 70, 229, 0.15) !important;
-  color: #a5b4fc !important;
+.sidebar__link:hover {
+  background-color: var(--bg-main) !important;
+  color: var(--text-dark) !important;
 }
-.sidebar ul li.active a {
-  background-color: var(--primary) !important;
-  color: #fff !important;
-  box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);
+.sidebar__link--active {
+  background-color: var(--primary-light) !important;
+  color: var(--primary) !important;
+  font-weight: 600 !important;
+  box-shadow: none !important;
+}
+.sidebar__user {
+  border-top: 1px solid var(--border-color) !important;
+  background: #ffffff !important;
+}
+.sidebar__user-name {
+  color: var(--text-dark) !important;
+  font-weight: 600 !important;
 }
 .sidebar-bottom { color: #64748b !important; }
 
@@ -117,20 +182,61 @@ button {
   box-shadow: 0 6px 16px rgba(79, 70, 229, 0.35);
 }
 
-/* ========== Dashboard Header ========== */
+/* ========== Dashboard Header & Tabs ========== */
 .dash-header {
   border-bottom: 1px solid var(--border-color);
-  padding-bottom: 15px;
-  margin-bottom: 25px;
+  margin-bottom: 24px;
 }
-.dash-header__tabs { display: flex; gap: 4px; background: #f1f5f9; border-radius: var(--radius-md); padding: 4px; }
+.dash-header__tabs { 
+  display: flex; 
+  gap: 24px; 
+}
 .dash-header__tab {
-  padding: 8px 20px; border-radius: var(--radius-sm); border: none; background: transparent;
-  color: var(--text-muted); font-weight: 500; cursor: pointer; transition: all 0.2s;
+  padding: 12px 4px; 
+  border: none; 
+  background: transparent;
+  color: var(--text-muted); 
+  font-weight: 500; 
+  cursor: pointer; 
+  transition: all 0.2s;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  font-size: 0.95rem;
+}
+.dash-header__tab:hover {
+  color: var(--text-dark);
 }
 .dash-header__tab--active {
-  background: var(--bg-card) !important; color: var(--primary) !important;
-  box-shadow: var(--shadow-sm); font-weight: 600;
+  background: transparent !important; 
+  color: var(--primary) !important;
+  box-shadow: none; 
+  font-weight: 600;
+  border-bottom: 3px solid var(--primary);
+}
+
+/* ========== Topbar ========== */
+.dashboard-layout__topbar {
+  background: #ffffff !important;
+  border-bottom: 1px solid var(--border-color) !important;
+  height: 64px !important;
+  padding: 0 24px !important;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02) !important;
+}
+.topbar__search-input {
+  background: #f1f5f9;
+  border: 1px solid transparent;
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 0.9rem;
+  width: 250px;
+  transition: all 0.2s;
+  color: var(--text-dark);
+}
+.topbar__search-input:focus {
+  background: #fff;
+  border-color: var(--primary);
+  outline: none;
+  box-shadow: 0 0 0 3px var(--primary-light);
 }
 
 /* ========== Dashboard Stats Row ========== */
@@ -583,6 +689,31 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-dark); letter-spaci
 .rejected-banner-content strong { color: #991B1B; font-size: 0.95rem; display: block; }
 .rejected-banner-content p { margin: 4px 0 0 0; color: #B91C1C; font-size: 0.85rem; }
 
+/* ========== Goals Filters & Tabs ========== */
+.goals-filters {
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border-color); margin-bottom: 24px;
+}
+.goals-filters__tabs { display: flex; gap: 24px; }
+.goals-filters__tab {
+  padding: 12px 4px; border: none; background: transparent;
+  color: var(--text-muted); font-weight: 500; cursor: pointer;
+  transition: all 0.2s; border-bottom: 3px solid transparent;
+  border-radius: 0; font-size: 0.95rem;
+}
+.goals-filters__tab:hover { color: var(--text-dark); }
+.goals-filters__tab--active {
+  background: transparent !important; color: var(--primary) !important;
+  box-shadow: none !important; font-weight: 600; border-bottom: 3px solid var(--primary);
+}
+.goals-filters__controls input, .goals-filters__controls select {
+  padding: 8px 16px; border-radius: 20px !important; border: 1px solid transparent !important;
+  outline: none; font-size: 0.9rem; transition: all 0.2s; background: #f1f5f9; color: var(--text-dark);
+}
+.goals-filters__controls input:focus, .goals-filters__controls select:focus {
+  background: #fff; border-color: var(--primary) !important; box-shadow: 0 0 0 3px var(--primary-light) !important;
+}
+
 /* ========== Responsive ========== */
 @media (max-width: 1024px) {
   .dash-stats-row { grid-template-columns: repeat(2, 1fr); }
@@ -600,3 +731,101 @@ h1, h2, h3, h4, h5, h6 { font-weight: 700; color: var(--text-dark); letter-spaci
   .main-content { padding: 16px !important; }
 }
 
+/* ========== Goal Items ========== */
+.goal-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  border: 1px solid var(--border-color) !important;
+  border-radius: var(--radius-md) !important;
+  margin-bottom: 12px;
+  background: #ffffff !important;
+  transition: all 0.2s;
+}
+.goal-item:hover {
+  border-color: #cbd5e1 !important;
+  box-shadow: var(--shadow-sm) !important;
+}
+.goal-item__info {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.goal-item__title {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: var(--text-dark);
+}
+.goal-item__meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  color: var(--text-muted);
+}
+.goal-item__status {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 600;
+  font-size: 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+}
+.goal-item__progress {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 160px;
+}
+.goal-item__bar {
+  flex: 1;
+  background: #e2e8f0 !important;
+  height: 6px !important;
+  border-radius: 4px !important;
+  overflow: hidden;
+}
+.goal-item__bar-fill {
+  height: 100% !important;
+  border-radius: 4px !important;
+  transition: width 0.5s ease;
+}
+
+/* ========== Global Softening (Phase 6) ========== */
+input, select, textarea {
+  border-radius: var(--radius-sm) !important;
+  border: 1px solid var(--border-color);
+  transition: all 0.2s;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 3px var(--primary-light) !important;
+  outline: none;
+}
+.badge, .status-badge, .role-badge {
+  border-radius: 12px !important;
+}
+.table, table {
+  background: white;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  border: 1px solid var(--border-color);
+}
+th, thead td {
+  background: #f8fafc !important;
+  color: var(--text-muted) !important;
+  font-weight: 600 !important;
+  text-transform: uppercase;
+  font-size: 0.75rem;
+  letter-spacing: 0.05em;
+}
+.modal-content, .modal, .modal-body {
+  border-radius: var(--radius-xl) !important;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04) !important;
+}
+.goal-item__pct {
+  font-weight: 600;
+  font-size: 0.85rem;
+  width: 32px;
+  text-align: right;
+}

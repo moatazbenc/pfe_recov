@@ -8,7 +8,8 @@ const { sendNotificationEmail } = require('../utils/mailer');
 // Get all notifications for current user
 router.get('/', auth, async function(req, res) {
   try {
-    const notifications = await Notification.find({ user: req.user.id })
+    const notifications = await Notification.find({ recipient: req.user.id })
+      .populate('sender', 'name profileImage') // Populate sender info
       .sort({ createdAt: -1 })
       .limit(50);
     res.json(notifications);
@@ -22,8 +23,8 @@ router.get('/', auth, async function(req, res) {
 router.get('/unread-count', auth, async function(req, res) {
   try {
     const count = await Notification.countDocuments({ 
-      user: req.user.id, 
-      read: false 
+      recipient: req.user.id, 
+      isRead: false 
     });
     res.json({ count: count });
   } catch (err) {
@@ -32,24 +33,32 @@ router.get('/unread-count', auth, async function(req, res) {
   }
 });
 
-// Create notification (for testing or admin use)
+// Create notification
 router.post('/', auth, async function(req, res) {
   try {
-    const { userId, title, message, link, sendEmail } = req.body;
+    // NOTE: 'sendEmailFlag' is a boolean from caller — renamed to avoid shadowing the imported sendNotificationEmail
+    const { recipientId, type, title, message, link, sendEmail: sendEmailFlag } = req.body;
 
     const notification = await Notification.create({
-      user: userId || req.user.id,
+      recipient: recipientId || req.user.id,
+      sender: req.user.id,
+      type: type || 'GOAL_UPDATE',
       title: title,
       message: message,
       link: link || '',
-      read: false
+      isRead: false
     });
 
-    // Send email if requested
-    if (sendEmail) {
-      const user = await User.findById(userId || req.user.id);
+    // Send email if caller requested it
+    if (sendEmailFlag) {
+      const user = await User.findById(recipientId || req.user.id);
       if (user && user.email) {
-        await sendNotificationEmail(user, notification);
+        try {
+          // Use the already-imported sendNotificationEmail (no re-require needed)
+          await sendNotificationEmail(user, notification);
+        } catch (mErr) {
+          console.error('Mail send failed (non-fatal):', mErr.message);
+        }
       }
     }
 
@@ -60,48 +69,13 @@ router.post('/', auth, async function(req, res) {
   }
 });
 
-// Send notification to all users (admin only)
-router.post('/broadcast', auth, async function(req, res) {
-  try {
-    const { title, message, link, sendEmail } = req.body;
-
-    const users = await User.find();
-    const notifications = [];
-
-    for (var i = 0; i < users.length; i++) {
-      var user = users[i];
-      
-      var notification = await Notification.create({
-        user: user._id,
-        title: title,
-        message: message,
-        link: link || '',
-        read: false
-      });
-      
-      notifications.push(notification);
-
-      if (sendEmail && user.email) {
-        await sendNotificationEmail(user, notification);
-      }
-    }
-
-    res.status(201).json({ 
-      message: 'Broadcast sent to ' + notifications.length + ' users',
-      count: notifications.length 
-    });
-  } catch (err) {
-    console.error('Broadcast notification error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
 
 // Mark notification as read
 router.post('/:id/read', auth, async function(req, res) {
   try {
-    const notification = await Notification.findByIdAndUpdate(
-      req.params.id, 
-      { read: true },
+    const notification = await Notification.findOneAndUpdate(
+      { _id: req.params.id, recipient: req.user.id }, 
+      { isRead: true },
       { new: true }
     );
     
@@ -120,8 +94,8 @@ router.post('/:id/read', auth, async function(req, res) {
 router.post('/read-all', auth, async function(req, res) {
   try {
     await Notification.updateMany(
-      { user: req.user.id, read: false },
-      { read: true }
+      { recipient: req.user.id, isRead: false },
+      { isRead: true }
     );
     res.json({ message: 'All notifications marked as read' });
   } catch (err) {
@@ -133,7 +107,7 @@ router.post('/read-all', auth, async function(req, res) {
 // Delete notification
 router.delete('/:id', auth, async function(req, res) {
   try {
-    await Notification.findByIdAndDelete(req.params.id);
+    await Notification.findOneAndDelete({ _id: req.params.id, recipient: req.user.id });
     res.json({ message: 'Notification deleted' });
   } catch (err) {
     console.error('Delete notification error:', err);
@@ -141,18 +115,4 @@ router.delete('/:id', auth, async function(req, res) {
   }
 });
 
-// Delete all read notifications
-router.delete('/clear/read', auth, async function(req, res) {
-  try {
-    const result = await Notification.deleteMany({ 
-      user: req.user.id, 
-      read: true 
-    });
-    res.json({ message: 'Deleted ' + result.deletedCount + ' notifications' });
-  } catch (err) {
-    console.error('Clear read notifications error:', err);
-    res.status(500).json({ message: 'Server error' });
-  }
-});
-
-module.exports = router;
+module.exports = router;

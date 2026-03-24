@@ -19,7 +19,8 @@ function Dashboard() {
   const [recentActivity, setRecentActivity] = useState({ objectives: [], decisions: [] });
   const [performance, setPerformance] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [aiRisks, setAiRisks] = useState([]);
+  const [userTeams, setUserTeams] = useState([]); // Teams the user belongs to
+  // AI risks removed — AI feature removed
 
   var API = 'http://localhost:5000';
 
@@ -37,11 +38,24 @@ function Dashboard() {
       var token = localStorage.getItem('token');
       var headers = { Authorization: 'Bearer ' + token };
 
+      // Fetch stats and recent activity scoped to the selected tab
       var promises = [
         axios.get(API + '/api/stats/dashboard?scope=' + scope, { headers }),
         axios.get(API + '/api/stats/recent-activity?scope=' + scope, { headers }),
-        axios.get(API + '/api/objectives/my', { headers }),
       ];
+
+      // Fetch objectives correctly scoped per tab:
+      //   'me'   -> /api/objectives/my  (only the logged-in user's goals)
+      //   'team' -> /api/objectives?scope=team (team-scoped goals)
+      //   'org'  -> /api/objectives (all goals — admins/HR only useful here)
+      if (tab === 'me') {
+        promises.push(axios.get(API + '/api/objectives/my', { headers }));
+      } else if (tab === 'team') {
+        promises.push(axios.get(API + '/api/objectives?scope=team', { headers }));
+      } else {
+        // org-wide
+        promises.push(axios.get(API + '/api/objectives', { headers }));
+      }
 
       if (user.role === 'ADMIN' || user.role === 'HR') {
         promises.push(axios.get(API + '/api/stats/performance', { headers }));
@@ -52,19 +66,35 @@ function Dashboard() {
       setStats(results[0].data);
       setRecentActivity(results[1].data);
       var objs = results[2].data;
-      setObjectives(Array.isArray(objs) ? objs : (objs.objectives || []));
+      // Normalise: API can return array, { objectives }, or { individualObjectives, teamObjectives }
+      var objArr = Array.isArray(objs)
+        ? objs
+        : (objs.objectives || (objs.individualObjectives ? [...(objs.individualObjectives || []), ...(objs.teamObjectives || [])] : []));
+      setObjectives(objArr);
       if (results[3]) setPerformance(results[3].data);
 
-      // AI Risk Detection
-      try {
-        var objArr = Array.isArray(objs) ? objs : (objs.objectives || []);
-        if (objArr.length > 0) {
-          var riskRes = await axios.post(API + '/api/ai/detect-risks', { objectives: objArr }, { headers });
-          setAiRisks(riskRes.data.risks || []);
-        } else {
-          setAiRisks([]);
+      // Fetch user's teams for the 'My Team' tab context
+      if (tab === 'team') {
+        try {
+          var teamsRes = await axios.get(API + '/api/teams', { headers });
+          var teamsData = teamsRes.data;
+          var allTeams = Array.isArray(teamsData) ? teamsData : [];
+          // Filter to teams where user is a member or leader
+          var myTeams = allTeams.filter(function(t) {
+            var isLeader = t.leader && (t.leader._id === user._id || t.leader._id === user.id);
+            var isMember = (t.members || []).some(function(m) {
+              return (m._id || m) === (user._id || user.id);
+            });
+            return isLeader || isMember;
+          });
+          setUserTeams(myTeams);
+        } catch (e) {
+          // Collaborators don't have access to /api/teams — gracefully skip
+          setUserTeams([]);
         }
-      } catch (e) { }
+      } else {
+        setUserTeams([]);
+      }
     } catch (err) {
       console.error('Fetch dashboard data error:', err);
     } finally {
@@ -80,10 +110,11 @@ function Dashboard() {
     setActiveTab(newTab);
   }
 
-  function getHeatmapData() {
+    function getHeatmapData() {
     var objArr = Array.isArray(objectives) ? objectives : [];
+    var approvedArr = objArr.filter(function(o) { return ['approved', 'validated'].includes(o.status); });
     var statusGroups = { on_track: 0, at_risk: 0, off_track: 0, achieved: 0, no_status: 0, closed: 0 };
-    objArr.forEach(function (o) {
+    approvedArr.forEach(function (o) {
       var s = o.goalStatus || 'no_status';
       if (statusGroups[s] !== undefined) statusGroups[s]++;
       else statusGroups.no_status++;
@@ -117,6 +148,7 @@ function Dashboard() {
     var objArr = Array.isArray(objectives) ? objectives : [];
     var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     return objArr.filter(function (o) {
+      if (!['approved', 'validated'].includes(o.status)) return false;
       if (o.goalStatus === 'achieved' || o.goalStatus === 'closed') return false;
       var lastUpdated = new Date(o.updatedAt || o.createdAt);
       return lastUpdated < fourteenDaysAgo;
@@ -142,55 +174,139 @@ function Dashboard() {
     <div className="dash">
       <DashboardHeader activeTab={activeTab} onTabChange={handleTabChange} />
 
+      {/* Scope context banner — changes per tab */}
+      {activeTab === 'team' && (
+        <div style={{ background: 'linear-gradient(135deg,#ede9fe,#dbeafe)', border: '1px solid #c4b5fd', borderRadius: '14px', padding: '1.25rem 1.75rem', marginBottom: '1.75rem', display: 'flex', gap: '1.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <div><span style={{ fontSize: '2rem' }}>👥</span></div>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800, fontSize: '1.05rem', color: '#4c1d95' }}>
+              My Team{userTeams.length > 1 ? 's' : ''}
+              {userTeams.length > 0 && <span style={{ marginLeft: '8px', background: '#7c3aed', color: '#fff', borderRadius: '99px', padding: '2px 10px', fontSize: '0.8rem' }}>{userTeams.length} team{userTeams.length > 1 ? 's' : ''}</span>}
+            </div>
+            {userTeams.length > 0 ? (
+              <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginTop: '8px' }}>
+                {userTeams.map(function(t) { return (
+                  <span key={t._id} style={{ background: '#fff', border: '1px solid #c4b5fd', borderRadius: '8px', padding: '4px 12px', fontSize: '0.85rem', color: '#5b21b6' }}>
+                    <strong>{t.name}</strong> &mdash; {(t.members || []).length} member{(t.members || []).length !== 1 ? 's' : ''}
+                    {t.leader && <span style={{ color: '#7c3aed', marginLeft: '6px' }}>(Leader: {t.leader.name})</span>}
+                  </span>
+                ); })}
+              </div>
+            ) : (
+              <p style={{ margin: '4px 0 0', color: '#6d28d9', fontSize: '0.9rem' }}>Showing team-scoped data. You are not yet assigned to a team.</p>
+            )}
+          </div>
+        </div>
+      )}
+      {activeTab === 'org' && (
+        <div style={{ background: 'linear-gradient(135deg,#ecfdf5,#d1fae5)', border: '1px solid #6ee7b7', borderRadius: '14px', padding: '1.25rem 1.75rem', marginBottom: '1.75rem', display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          <span style={{ fontSize: '2rem' }}>🏢</span>
+          <div>
+            <div style={{ fontWeight: 800, color: '#065f46' }}>My Organisation — Company-Wide View</div>
+            <p style={{ margin: '4px 0 0', color: '#047857', fontSize: '0.9rem' }}>Showing all organisation goals and metrics. Data is not filtered by team or individual.</p>
+          </div>
+        </div>
+      )}
+
       {/* Quick Stats Row */}
-      <div className="dash-stats-row">
-        <div className="dash-stat">
-          <div className="dash-stat__icon dash-stat__icon--purple">🎯</div>
+      <div className="dash-stats-row" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1.5rem', marginBottom: '2rem' }}>
+        <div className="dash-stat dash-card shadow-sm" style={{ borderLeft: '4px solid var(--primary)' }}>
+          <div className="dash-stat__icon" style={{ background: 'var(--primary-light)', color: 'var(--primary)', fontSize: '1.5rem', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🎯</div>
           <div className="dash-stat__info">
-            <span className="dash-stat__value">{stats.objectives}</span>
-            <span className="dash-stat__label">{labels.goals}</span>
+            <span className="dash-stat__value" style={{ fontSize: '1.8rem', fontWeight: '800', display: 'block' }}>{stats.objectives}</span>
+            <span className="dash-stat__label" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{labels.goals}</span>
           </div>
         </div>
-        <div className="dash-stat">
-          <div className="dash-stat__icon dash-stat__icon--blue">👥</div>
+        <div className="dash-stat dash-card shadow-sm" style={{ borderLeft: '4px solid #3B82F6' }}>
+          <div className="dash-stat__icon" style={{ background: 'rgba(59, 130, 246, 0.1)', color: '#3B82F6', fontSize: '1.5rem', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👥</div>
           <div className="dash-stat__info">
-            <span className="dash-stat__value">{stats.teams}</span>
-            <span className="dash-stat__label">{labels.teams}</span>
+            <span className="dash-stat__value" style={{ fontSize: '1.8rem', fontWeight: '800', display: 'block' }}>{stats.teams}</span>
+            <span className="dash-stat__label" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{labels.teams}</span>
           </div>
         </div>
-        <div className="dash-stat">
-          <div className="dash-stat__icon dash-stat__icon--green">👤</div>
+        <div className="dash-stat dash-card shadow-sm" style={{ borderLeft: '4px solid #10B981' }}>
+          <div className="dash-stat__icon" style={{ background: 'rgba(16, 185, 129, 0.1)', color: '#10B981', fontSize: '1.5rem', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>👤</div>
           <div className="dash-stat__info">
-            <span className="dash-stat__value">{stats.users}</span>
-            <span className="dash-stat__label">{labels.users}</span>
+            <span className="dash-stat__value" style={{ fontSize: '1.8rem', fontWeight: '800', display: 'block' }}>{stats.users}</span>
+            <span className="dash-stat__label" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{labels.users}</span>
           </div>
         </div>
-        <div className="dash-stat">
-          <div className="dash-stat__icon dash-stat__icon--orange">📅</div>
+        <div className="dash-stat dash-card shadow-sm" style={{ borderLeft: '4px solid #F59E0B' }}>
+          <div className="dash-stat__icon" style={{ background: 'rgba(245, 158, 11, 0.1)', color: '#F59E0B', fontSize: '1.5rem', width: '48px', height: '48px', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>📅</div>
           <div className="dash-stat__info">
-            <span className="dash-stat__value">{stats.cycles}</span>
-            <span className="dash-stat__label">{labels.cycles}</span>
+            <span className="dash-stat__value" style={{ fontSize: '1.8rem', fontWeight: '800', display: 'block' }}>{stats.cycles}</span>
+            <span className="dash-stat__label" style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>{labels.cycles}</span>
           </div>
         </div>
       </div>
 
-      {/* AI Risk Alerts */}
-      {aiRisks.length > 0 && (
-        <div className="dash-risk-alerts">
-          <h3 className="dash-risk-alerts__title">🤖 AI Risk Alerts ({aiRisks.length})</h3>
-          <div className="dash-risk-alerts__list">
-            {aiRisks.slice(0, 3).map(function (r, i) {
-              var severityClass = r.severity === 'high' ? 'dash-risk--high' : r.severity === 'medium' ? 'dash-risk--medium' : 'dash-risk--low';
-              var icon = r.severity === 'high' ? '🔴' : r.severity === 'medium' ? '🟡' : '🔵';
+      {/* Progress Circles Row */}
+      <div className="dash-progress-row" style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '1.5rem', marginBottom: '2.5rem' }}>
+        <div className="dash-card shadow-sm" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '2rem' }}>
+          <h3 style={{ marginBottom: '1.5rem', textAlign: 'center' }}>Overall Progress</h3>
+          {(() => {
+            var objArr = Array.isArray(objectives) ? objectives : [];
+            var approvedArr = objArr.filter(function(o) { return ['approved', 'validated'].includes(o.status); });
+            var liveAvg = approvedArr.length > 0
+              ? Math.round(approvedArr.reduce(function(s, o) { return s + (o.achievementPercent || 0); }, 0) / approvedArr.length)
+              : 0;
+            return (
+              <>
+                <ProgressDonut percentage={liveAvg} size={150} strokeWidth={15} />
+                <div style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+                  <span style={{ fontSize: '2rem', fontWeight: 'bold', color: 'var(--primary)' }}>{liveAvg}%</span>
+                  <p className="text-muted">Average goal progress {activeTab === 'me' ? '(personal)' : activeTab === 'team' ? '(team)' : '(organisation)'}</p>
+                </div>
+              </>
+            );
+          })()}
+        </div>
+        <div className="dash-card shadow-sm" style={{ padding: '1.5rem' }}>
+          <h3 style={{ marginBottom: '1rem' }}>Key Performance Indicators</h3>
+          {(() => {
+            // Gather all KPIs across active objectives
+            var objArr = Array.isArray(objectives) ? objectives : [];
+            var allKpis = [];
+            objArr.forEach(function(o) {
+              if (!['approved', 'validated'].includes(o.status)) return;
+              if (!o.kpis || o.kpis.length === 0) return;
+              o.kpis.forEach(function(kpi) {
+                allKpis.push({ goalTitle: o.title, name: kpi.name, current: kpi.currentValue || 0, target: kpi.targetValue || 100, unit: kpi.unit || '', type: kpi.type });
+              });
+            });
+            if (allKpis.length === 0) {
               return (
-                <div key={i} className={'dash-risk-item ' + severityClass}>
-                  <span>{icon} {r.message}</span>
+                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '120px', color: 'var(--text-muted)' }}>
+                  <div style={{ fontSize: '2rem', marginBottom: '8px' }}>📊</div>
+                  <p style={{ margin: 0, textAlign: 'center' }}>No KPIs tracked yet.<br /><a href="/goals" style={{ color: 'var(--primary)' }}>Add KPIs to your goals →</a></p>
                 </div>
               );
-            })}
-          </div>
+            }
+            return (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+                {allKpis.slice(0, 4).map(function(kpi, i) {
+                  var pct = kpi.target > 0 ? Math.min(Math.round((kpi.current / kpi.target) * 100), 100) : 0;
+                  var colors = ['var(--primary)', '#3B82F6', '#10B981', '#F59E0B'];
+                  var color = colors[i % colors.length];
+                  return (
+                    <div key={i} style={{ padding: '1rem', background: 'var(--bg-main)', borderRadius: '12px' }}>
+                      <div style={{ color: color, fontWeight: '700', fontSize: '0.85rem', marginBottom: '2px' }}>{kpi.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', marginBottom: '8px' }}>📎 {kpi.goalTitle}</div>
+                      <div style={{ fontSize: '1.3rem', fontWeight: '800', margin: '4px 0' }}>{kpi.current}{kpi.unit} <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 400 }}>/ {kpi.target}{kpi.unit}</span></div>
+                      <div className="progress-bar-bg" style={{ height: '8px', background: 'rgba(0,0,0,0.1)', borderRadius: '4px' }}>
+                        <div className="progress-bar-fill" style={{ width: pct + '%', height: '100%', background: color, borderRadius: '4px', transition: 'width 0.5s ease' }}></div>
+                      </div>
+                      <div style={{ textAlign: 'right', fontSize: '0.75rem', color: color, marginTop: '4px', fontWeight: '600' }}>{pct}%</div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
-      )}
+      </div>
+
+      {/* AI Risk Alerts removed — AI feature removed */}
 
       {/* Action Center - Needs Attention */}
       {staleGoals.length > 0 && (

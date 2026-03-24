@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import { useAuth } from '../AuthContext';
-
-var API = 'http://localhost:5000';
 
 function EditGoalModal({ goal, onClose, onUpdated, cycles, parentGoals, existingObjectives }) {
     var { user } = useAuth();
@@ -66,7 +64,7 @@ function EditGoalModal({ goal, onClose, onUpdated, cycles, parentGoals, existing
                 parentObjective: form.parentObjective || null,
                 goalStatus: form.goalStatus,
             };
-            await axios.put(API + '/api/objectives/' + goal._id, payload);
+            await api.put('/api/objectives/' + goal._id, payload);
             if (onUpdated) onUpdated();
             onClose();
         } catch (err) {

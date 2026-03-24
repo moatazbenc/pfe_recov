@@ -1,8 +1,6 @@
 import React, { useState } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import './CheckInModal.css';
-
-const API = 'http://localhost:5000';
 
 function CheckInModal({ goal, onClose, onCheckInComplete }) {
     // Local state for KPI updates. Initialize with current values.
@@ -20,7 +18,6 @@ function CheckInModal({ goal, onClose, onCheckInComplete }) {
     const [status, setStatus] = useState(goal.goalStatus || 'no_status');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
-    const [isDrafting, setIsDrafting] = useState(false);
     const [error, setError] = useState('');
 
     const handleKpiChange = (id, newCurrentValue) => {
@@ -32,43 +29,18 @@ function CheckInModal({ goal, onClose, onCheckInComplete }) {
         }));
     };
 
-    const handleAutoDraft = async () => {
-        setIsDrafting(true);
-        try {
-            const token = localStorage.getItem('token');
-            const res = await axios.post(`${API}/api/ai/draft-checkin`, {
-                goalTitle: goal.title,
-                oldKpis: goal.kpis,
-                newKpis: kpiUpdates,
-                newStatus: status
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
-            });
-            if (res.data.draft) {
-                setMessage(res.data.draft);
-            }
-        } catch (err) {
-            console.error('Failed to auto-draft', err);
-        } finally {
-            setIsDrafting(false);
-        }
-    };
-
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setIsSubmitting(true);
         try {
-            const token = localStorage.getItem('token');
             // Extract just what the backend needs
             const payloadKpis = kpiUpdates.map(k => ({ _id: k._id, currentValue: k.currentValue }));
             
-            await axios.post(`${API}/api/objectives/${goal._id}/progress`, {
+            await api.post(`/api/objectives/${goal._id}/progress`, {
                 message,
                 goalStatus: status,
                 kpiUpdates: payloadKpis
-            }, {
-                headers: { Authorization: `Bearer ${token}` }
             });
             
             onCheckInComplete(); // refresh parent
@@ -97,7 +69,9 @@ function CheckInModal({ goal, onClose, onCheckInComplete }) {
                             <option value="on_track">On Track</option>
                             <option value="at_risk">At Risk</option>
                             <option value="off_track">Off Track</option>
-                            <option value="completed">Completed</option>
+                            {/* "completed" removed — not a valid goal status */}
+                            <option value="achieved">Achieved</option>
+                            <option value="closed">Closed</option>
                         </select>
                     </div>
 
@@ -144,12 +118,7 @@ function CheckInModal({ goal, onClose, onCheckInComplete }) {
 
                     {/* Narrative */}
                     <div className="goal-modal__field">
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                            <label>Progress Update</label>
-                            <button type="button" className="goal-modal__ai-btn" onClick={handleAutoDraft} disabled={isDrafting}>
-                                {isDrafting ? 'Drafting...' : '✨ Auto-Draft'}
-                            </button>
-                        </div>
+                        <label>Progress Update</label>
                         <textarea 
                             rows={4} 
                             placeholder="What progress have you made?" 

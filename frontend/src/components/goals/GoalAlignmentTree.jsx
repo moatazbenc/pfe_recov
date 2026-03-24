@@ -1,10 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import GoalProgressBar from './GoalProgressBar';
 import GoalStatusBadge from './GoalStatusBadge';
+import UserAvatar from '../UserAvatar';
 import './GoalAlignmentTree.css';
-
-const API = 'http://localhost:5000';
 
 function GoalNode({ goal, level = 0 }) {
   const [children, setChildren] = useState([]);
@@ -19,10 +18,7 @@ function GoalNode({ goal, level = 0 }) {
     
     setLoading(true);
     try {
-      const token = localStorage.getItem('token');
-      const res = await axios.get(`${API}/api/objectives/${goal._id}/children`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await api.get(`/api/objectives/${goal._id}/children`);
       setChildren(res.data.objectives || []);
       setExpanded(true);
     } catch (err) {
@@ -50,7 +46,10 @@ function GoalNode({ goal, level = 0 }) {
           </div>
         </div>
         <div className="goal-tree-card-bottom">
-          <div className="goal-tree-owner">👤 {goal.owner?.name || 'Unknown'}</div>
+          <div className="goal-tree-owner" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <UserAvatar user={goal.owner} size={24} /> 
+              <span>{goal.owner?.name || 'Unknown'}</span>
+          </div>
           <div style={{ width: '100px' }}>
             <GoalProgressBar percent={goal.achievementPercent || 0} size="small" />
           </div>
@@ -90,11 +89,8 @@ function GoalAlignmentTree({ rootGoal }) {
         return;
       }
       try {
-        const token = localStorage.getItem('token');
         const parentId = typeof rootGoal.parentObjective === 'object' ? rootGoal.parentObjective._id : rootGoal.parentObjective;
-        const res = await axios.get(`${API}/api/objectives/${parentId}`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
+        const res = await api.get(`/api/objectives/${parentId}`);
         setParentGoal(res.data.objective || res.data);
       } catch (err) {
         console.error('Failed to fetch parent goal', err);
@@ -119,7 +115,10 @@ function GoalAlignmentTree({ rootGoal }) {
                 <GoalStatusBadge status={parentGoal.goalStatus || 'no_status'} />
               </div>
               <div className="goal-tree-card-bottom">
-                <div className="goal-tree-owner">👤 {parentGoal.owner?.name || 'Unknown'}</div>
+                <div className="goal-tree-owner" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <UserAvatar user={parentGoal.owner} size={24} /> 
+                    <span>{parentGoal.owner?.name || 'Unknown'}</span>
+                </div>
                 <div style={{ width: '100px' }}><GoalProgressBar percent={parentGoal.achievementPercent || 0} size="small" /></div>
               </div>
             </div>

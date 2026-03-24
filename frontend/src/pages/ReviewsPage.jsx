@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
-
-var API = 'http://localhost:5000';
+import { useToast } from '../components/common/Toast';
+import LoadingSkeleton from '../components/common/LoadingSkeleton';
 
 function ReviewsPage() {
   var { user } = useAuth();
@@ -20,8 +20,8 @@ function ReviewsPage() {
   var [conductForm, setConductForm] = useState({ responses: [], overallRating: 0, overallComments: '', strengths: '', areasForImprovement: '' });
   var [sending, setSending] = useState(false);
 
-  var token = localStorage.getItem('token');
-  var headers = { Authorization: 'Bearer ' + token };
+  var toast = useToast();
+  var [showDetail, setShowDetail] = useState(null);
   var isAdmin = user.role === 'ADMIN' || user.role === 'HR';
 
   useEffect(function () { loadData(); }, [tab]);
@@ -30,33 +30,33 @@ function ReviewsPage() {
     setLoading(true);
     var reviewUrl = tab === 'my' ? '/api/reviews/my' : tab === 'about' ? '/api/reviews/about-me' : '/api/reviews/all';
     Promise.all([
-      axios.get(API + reviewUrl, { headers: headers }),
-      axios.get(API + '/api/reviews/templates', { headers: headers }),
-      axios.get(API + '/api/users', { headers: headers }),
-      axios.get(API + '/api/cycles', { headers: headers }),
+      api.get(reviewUrl),
+      api.get('/api/reviews/templates'),
+      api.get('/api/users'),
+      api.get('/api/cycles'),
     ]).then(function (res) {
       setReviews(res[0].data.reviews || []);
       setTemplates(res[1].data.templates || []);
       setUsers(Array.isArray(res[2].data) ? res[2].data : (res[2].data.users || []));
       setCycles(Array.isArray(res[3].data) ? res[3].data : (res[3].data.cycles || res[3].data.data || []));
-    }).catch(function () {}).finally(function () { setLoading(false); });
+    }).catch(function () { toast.error('Failed to load reviews'); }).finally(function () { setLoading(false); });
   }
 
   function handleCreateReview() {
     if (!form.revieweeId || !form.type) return;
     setSending(true);
-    axios.post(API + '/api/reviews', form, { headers: headers })
-      .then(function () { setShowCreate(false); setForm({ revieweeId: '', templateId: '', cycleId: '', type: 'self' }); loadData(); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); })
+    api.post('/api/reviews', form)
+      .then(function () { setShowCreate(false); setForm({ revieweeId: '', templateId: '', cycleId: '', type: 'self' }); loadData(); toast.success('Review assigned!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error'); })
       .finally(function () { setSending(false); });
   }
 
   function handleCreateTemplate() {
     if (!templateForm.name || !templateForm.questions.length) return;
     setSending(true);
-    axios.post(API + '/api/reviews/templates', templateForm, { headers: headers })
-      .then(function () { setShowTemplateForm(false); setTemplateForm({ name: '', description: '', type: 'general', questions: [{ text: '', type: 'rating', maxScore: 5, category: 'general' }] }); loadData(); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); })
+    api.post('/api/reviews/templates', templateForm)
+      .then(function () { setShowTemplateForm(false); setTemplateForm({ name: '', description: '', type: 'general', questions: [{ text: '', type: 'rating', maxScore: 5, category: 'general' }] }); loadData(); toast.success('Template created!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error'); })
       .finally(function () { setSending(false); });
   }
 
@@ -80,16 +80,16 @@ function ReviewsPage() {
 
   function handleSubmitReview() {
     setSending(true);
-    axios.put(API + '/api/reviews/' + showConduct._id + '/submit', conductForm, { headers: headers })
-      .then(function () { setShowConduct(null); loadData(); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); })
+    api.put('/api/reviews/' + showConduct._id + '/submit', conductForm)
+      .then(function () { setShowConduct(null); loadData(); toast.success('Review submitted!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error'); })
       .finally(function () { setSending(false); });
   }
 
   function handleSaveDraft() {
-    axios.put(API + '/api/reviews/' + showConduct._id + '/draft', conductForm, { headers: headers })
-      .then(function () { alert('Draft saved!'); })
-      .catch(function (e) { alert(e.response?.data?.message || 'Error'); });
+    api.put('/api/reviews/' + showConduct._id + '/draft', conductForm)
+      .then(function () { toast.success('Draft saved!'); })
+      .catch(function (e) { toast.error(e.response?.data?.message || 'Error'); });
   }
 
   var typeLabels = { self: '🪞 Self', manager: '👔 Manager', peer: '🤝 Peer', '360': '🔄 360°', upward: '⬆️ Upward' };
@@ -190,7 +190,7 @@ function ReviewsPage() {
       </div>
 
       {loading ? (
-        <div className="loading-state"><div className="spinner"></div><p>Loading...</p></div>
+        <LoadingSkeleton rows={3} height={90} />
       ) : tab === 'templates' ? (
         <div className="template-list">
           {templates.length === 0 ? (
@@ -225,13 +225,76 @@ function ReviewsPage() {
                 </div>
                 <div className="review-item__actions">
                   {tab === 'my' && (r.status === 'pending' || r.status === 'in_progress') && <button className="btn btn--primary btn--sm" onClick={function () { openConduct(r); }}>Conduct Review</button>}
-                  {tab === 'about' && r.overallComments && <button className="btn btn--secondary btn--sm" onClick={function () { alert('Overall: ' + r.overallRating + '/5\n\n' + r.overallComments + '\n\nStrengths: ' + r.strengths + '\n\nImprovements: ' + r.areasForImprovement); }}>View Details</button>}
+                  {tab === 'about' && r.status === 'submitted' && <button className="btn btn--secondary btn--sm" onClick={function () { setShowDetail(r); }}>View Details</button>}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+      {showDetail && <ReviewDetailModal review={showDetail} onClose={function () { setShowDetail(null); }} />}
+    </div>
+  );
+}
+
+function ReviewDetailModal({ review, onClose }) {
+  if (!review) return null;
+  var typeLabels = { self: '🪞 Self', manager: '👔 Manager', peer: '🤝 Peer', '360': '🔄 360°', upward: '⬆️ Upward' };
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal-content modal-content--lg" onClick={function (e) { e.stopPropagation(); }}>
+        <div className="modal-header">
+          <h3 className="modal-title">{typeLabels[review.type] || review.type} Review — {review.reviewer?.name || 'Unknown'}</h3>
+          <button className="modal-close" onClick={onClose}>✕</button>
+        </div>
+        <div style={{ padding: '1rem 0' }}>
+          {review.overallRating && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: '4px', color: 'var(--text-muted)' }}>Overall Rating</div>
+              <div style={{ fontSize: '1.5rem' }}>{'⭐'.repeat(review.overallRating)} <span style={{ fontSize: '1rem' }}>{review.overallRating}/5</span></div>
+            </div>
+          )}
+          {review.overallComments && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: '4px' }}>Overall Comments</div>
+              <p style={{ background: 'var(--bg-main)', padding: '12px', borderRadius: '8px', lineHeight: 1.6 }}>{review.overallComments}</p>
+            </div>
+          )}
+          {review.strengths && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: '4px', color: '#10b981' }}>✅ Strengths</div>
+              <p style={{ background: '#ecfdf5', padding: '12px', borderRadius: '8px', lineHeight: 1.6 }}>{review.strengths}</p>
+            </div>
+          )}
+          {review.areasForImprovement && (
+            <div style={{ marginBottom: '1rem' }}>
+              <div style={{ fontWeight: 700, marginBottom: '4px', color: '#f59e0b' }}>💡 Areas for Improvement</div>
+              <p style={{ background: '#fffbeb', padding: '12px', borderRadius: '8px', lineHeight: 1.6 }}>{review.areasForImprovement}</p>
+            </div>
+          )}
+          {review.responses && review.responses.length > 0 && (
+            <div>
+              <div style={{ fontWeight: 700, marginBottom: '8px' }}>Question Responses</div>
+              {review.responses.map(function (r, i) {
+                return (
+                  <div key={i} style={{ marginBottom: '12px', padding: '10px', background: 'var(--bg-main)', borderRadius: '8px' }}>
+                    <div style={{ fontWeight: 600, marginBottom: '4px', fontSize: '0.9rem', color: 'var(--text-muted)' }}>{i + 1}. {r.questionText}</div>
+                    {r.score !== null && r.score !== undefined ? (
+                      <div>{'⭐'.repeat(r.score)} ({r.score}/{r.maxScore})</div>
+                    ) : (
+                      <div style={{ lineHeight: 1.5 }}>{r.answer || '—'}</div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+        <div className="form-actions hide-on-print">
+          <button className="btn btn--secondary" onClick={function () { window.print(); }}>🖨️ Export PDF</button>
+          <button className="btn btn--secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
     </div>
   );
 }

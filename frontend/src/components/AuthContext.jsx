@@ -142,7 +142,7 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const value = { user, token, loading, login, logout };
+  const value = { user, token, loading, login, logout, updateUser: setUser };
 
   if (loading) {
     return (

@@ -49,7 +49,9 @@ const schemas = {
             visibility: Joi.string().valid('private', 'team', 'department', 'public').default('public'),
             startDate: Joi.date().iso().allow(null, ''),
             parentObjective: objectId.allow(null, ''),
-            goalStatus: Joi.string().valid('no_status', 'on_track', 'at_risk', 'off_track', 'closed', 'achieved').default('no_status')
+            goalStatus: Joi.string().valid('no_status', 'not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'on_hold', 'closed', 'achieved').default('no_status'),
+            targetUser: objectId.allow(null, ''),
+            targetTeam: objectId.allow(null, ''),
         }),
         update: Joi.object({
             title: Joi.string().trim().min(5).max(100),
@@ -61,16 +63,18 @@ const schemas = {
             visibility: Joi.string().valid('private', 'team', 'department', 'public'),
             startDate: Joi.date().iso().allow(null, ''),
             parentObjective: objectId.allow(null, ''),
-            goalStatus: Joi.string().valid('no_status', 'on_track', 'at_risk', 'off_track', 'closed', 'achieved')
+            goalStatus: Joi.string().valid('no_status', 'not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'on_hold', 'closed', 'achieved'),
         }),
         submitProgress: Joi.object({
             achievementPercent: Joi.number().integer().min(0).max(100).required(),
             selfAssessment: Joi.string().allow('')
         }),
         validate: Joi.object({
-            status: Joi.string().valid('validated', 'rejected').required(),
+            status: Joi.string().valid('validated', 'approved', 'rejected', 'revision_requested').required(),
             managerAdjustedPercent: Joi.number().integer().min(0).max(100).allow(null),
-            managerComments: Joi.string().allow('')
+            managerComments: Joi.string().allow(''),
+            rejectionReason: Joi.string().allow(''),
+            revisionReason: Joi.string().allow(''),
         })
     },
     cycle: {

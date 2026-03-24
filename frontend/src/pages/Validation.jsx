@@ -45,12 +45,13 @@ function Validation() {
     
     try {
       await axios.post(API + '/api/objectives/' + selectedObjective._id + '/validate', {
-        approved: approved,
-        adjustedPercent: adjustedPercent,
-        managerComments: managerComments
+        status: approved ? 'approved' : 'rejected',
+        managerAdjustedPercent: adjustedPercent,
+        managerComments: managerComments,
+        rejectionReason: !approved ? managerComments : undefined,
       });
       
-      setSuccess(approved ? '✅ Objective validated!' : '❌ Objective rejected');
+      setSuccess(approved ? '✅ Objective approved!' : '❌ Objective rejected');
       setSelectedObjective(null);
       fetchObjectives();
     } catch (err) {
@@ -100,8 +101,8 @@ function Validation() {
                       <h3>🎯 {obj.title}</h3>
                       <span className="weight-badge">{obj.weight}</span>
                     </div>
-                    <p className="employee-name">👤 {obj.user?.name}</p>
-                    <p className="employee-email">{obj.user?.email}</p>
+                    <p className="employee-name">👤 {obj.owner?.name}</p>
+                    <p className="employee-email">{obj.owner?.email}</p>
                     <p className="cycle-name">📅 {obj.cycle?.name}</p>
                     <div className="achievement-display">
                       <span>Self-Assessment: {obj.achievementPercent}%</span>
@@ -124,8 +125,8 @@ function Validation() {
           </div>
           
           <div className="employee-info">
-            <p><strong>Employee:</strong> {selectedObjective.user?.name}</p>
-            <p><strong>Email:</strong> {selectedObjective.user?.email}</p>
+            <p><strong>Employee:</strong> {selectedObjective.owner?.name}</p>
+            <p><strong>Email:</strong> {selectedObjective.owner?.email}</p>
             <p><strong>Cycle:</strong> {selectedObjective.cycle?.name}</p>
           </div>
           

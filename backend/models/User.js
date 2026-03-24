@@ -31,6 +31,7 @@ const userSchema = new mongoose.Schema({
   tenantId: { type: String, default: 'default', index: true },
   refreshToken: { type: String, select: false },
   isDeleted: { type: Boolean, default: false, index: true },
+  profileImage: { type: String, default: '' },
 }, { timestamps: true });
 
 userSchema.pre('save', async function (next) {

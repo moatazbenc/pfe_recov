@@ -1,40 +1,66 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
-const { sendEmail } = require('../utils/mailer');
 
-exports.createNotification = async (userId, title, message, link) => {
-  try {
-    const notif = await Notification.create({
-      user: userId,
-      title,
-      message,
-      link
-    });
-
-    // Try to send email but don't let failures block the notification
-    try {
-      const user = await User.findById(userId);
-      if (user?.email) {
-        await sendEmail(user.email, title, message);
-      }
-    } catch (emailErr) {
-      console.error('Email notification failed (non-blocking):', emailErr.message);
-    }
-
-    return notif;
-  } catch (err) {
-    console.error('Create notification error:', err.message);
-    return null;
-  }
-};
-
+/**
+ * Get current user notifications
+ */
 exports.getMyNotifications = async (req, res) => {
-  const notifs = await Notification.find({ user: req.user.id })
-    .sort({ createdAt: -1 });
-  res.json(notifs);
+    try {
+        const notifs = await Notification.find({ recipient: req.user.id })
+            .populate('sender', 'name profileImage')
+            .sort({ createdAt: -1 })
+            .limit(50);
+        res.json(notifs);
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
 };
 
+/**
+ * Mark notification as read
+ */
 exports.markAsRead = async (req, res) => {
-  await Notification.findByIdAndUpdate(req.params.id, { read: true });
-  res.json({ success: true });
+    try {
+        await Notification.findOneAndUpdate(
+            { _id: req.params.id, recipient: req.user.id },
+            { isRead: true }
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+/**
+ * Mark all as read
+ */
+exports.markAllRead = async (req, res) => {
+    try {
+        await Notification.updateMany(
+            { recipient: req.user.id, isRead: false },
+            { isRead: true }
+        );
+        res.json({ success: true });
+    } catch (err) {
+        res.status(500).json({ success: false, message: err.message });
+    }
+};
+
+/**
+ * Legacy support for createNotification used by other controllers
+ */
+exports.createNotification = async (recipientId, title, message, link, type = 'GOAL_UPDATE') => {
+    try {
+        return await Notification.create({
+            recipient: recipientId,
+            title,
+            message,
+            link,
+            type,
+            isRead: false
+        });
+    } catch (err) {
+        console.error('Legacy createNotification failed:', err.message);
+        return null;
+    }
 };

@@ -10,7 +10,7 @@ router.use(auth);
 router.post('/', ctrl.createFeedback);
 
 // Request 360-degree feedback
-router.post('/request-360', ctrl.requestFeedback);
+router.post('/request', ctrl.requestFeedback);
 
 // Get feedback received by me
 router.get('/received', ctrl.getReceived);

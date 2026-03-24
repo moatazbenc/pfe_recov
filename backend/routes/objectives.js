@@ -14,24 +14,25 @@ router.get('/my', rateLimiter, auth, async (req, res) => {
         const Objective = require('../models/Objective');
         const objectives = await Objective.find({ owner: req.user.id })
             .populate('owner', 'name email role')
-            .populate('cycle', 'name year status');
+            .populate('cycle', 'name year status')
+            .populate('assignedBy', 'name email');
         res.json(objectives);
     } catch (err) {
         res.status(500).json({ message: err.message });
     }
 });
 router.get('/user/:userId/cycle/:cycleId', rateLimiter, auth, async (req, res) => {
-    // Mock bridging function until we unify Objectives into a more robust single fetch
-    // This matches what the frontend is actually calling: GET /api/objectives/user/:uid/cycle/:cid
     req.query.cycle = req.params.cycleId;
     req.query.targetUserId = req.params.userId;
     return objectiveController.getObjectives(req, res);
 });
 
 router.get('/pending-validation', rateLimiter, auth, role('TEAM_LEADER'), objectiveController.getPendingValidation);
+router.get('/pending-change-requests', rateLimiter, auth, role('TEAM_LEADER', 'ADMIN'), objectiveController.getPendingChangeRequests);
+router.get('/completed-awaiting-evaluation', rateLimiter, auth, role('TEAM_LEADER', 'ADMIN'), objectiveController.getCompletedAwaitingEvaluation);
 router.get('/:id', rateLimiter, auth, objectiveController.getObjectiveById);
 
-// Creation and modification allowed by leaders and collaborators
+// Creation and modification
 router.post('/', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER', 'COLLABORATOR'), validate(schemas.objective.create), objectiveController.createObjective);
 router.put('/:id', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER', 'COLLABORATOR'), validate(schemas.objective.update), objectiveController.updateObjective);
 router.delete('/:id', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER', 'COLLABORATOR'), objectiveController.deleteObjective);
@@ -39,10 +40,18 @@ router.delete('/:id', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER', 'COLLABORA
 // Workflow actions
 router.post('/submit-all', rateLimiter, auth, role('COLLABORATOR'), objectiveController.submitObjectives);
 router.post('/submit', rateLimiter, auth, objectiveController.submitObjectives);
+router.post('/submit/:id', rateLimiter, auth, objectiveController.submitObjective);
 router.post('/:id/submit', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER', 'COLLABORATOR'), validate(schemas.objective.submitProgress), objectiveController.submitProgress);
-router.post('/:id/validate', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER'), validate(schemas.objective.validate), objectiveController.validateObjective);
+router.post('/:id/submit-for-approval', rateLimiter, auth, objectiveController.submitObjective);
+router.post('/:id/validate', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER'), objectiveController.validateObjective);
+router.post('/:id/acknowledge', rateLimiter, auth, objectiveController.acknowledgeObjective);
+router.post('/:id/mark-completed', rateLimiter, auth, objectiveController.markCompleted);
+router.post('/:id/evaluate', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER'), objectiveController.evaluateObjective);
 
-// === NEW GOAL ROUTES ===
+// Change requests
+router.post('/:id/change-requests', rateLimiter, auth, objectiveController.createChangeRequest);
+router.put('/:id/change-requests/:crId', rateLimiter, auth, role('ADMIN', 'TEAM_LEADER'), objectiveController.resolveChangeRequest);
+
 // Goal status
 router.put('/:id/goal-status', rateLimiter, auth, objectiveController.updateGoalStatus);
 
@@ -58,7 +67,7 @@ router.post('/:id/progress', rateLimiter, auth, objectiveController.addProgressU
 router.post('/:id/comments', rateLimiter, auth, objectiveController.addComment);
 router.delete('/:id/comments/:commentId', rateLimiter, auth, objectiveController.deleteComment);
 
-// Sub-objectives (children)
+// Sub-objectives
 router.get('/:id/children', rateLimiter, auth, objectiveController.getSubObjectives);
 
 // Duplicate

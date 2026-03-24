@@ -15,7 +15,7 @@ router.get('/dashboard', auth, async function (req, res) {
 
     if (scope === 'me') {
       // Personal stats only
-      var myObjectives = await Objective.countDocuments({ owner: userId });
+      var myObjectives = await Objective.countDocuments({ owner: userId, status: { $in: ['approved', 'validated'] } });
       var myTeam = await Team.findOne({ $or: [{ leader: userId }, { members: userId }] });
       res.json({
         users: 1,
@@ -30,7 +30,7 @@ router.get('/dashboard', auth, async function (req, res) {
         return res.json({ users: 0, teams: 0, objectives: 0, cycles: 0 });
       }
       var teamMembers = [team.leader, ...team.members].filter(Boolean);
-      var teamObjectives = await Objective.countDocuments({ owner: { $in: teamMembers } });
+      var teamObjectives = await Objective.countDocuments({ owner: { $in: teamMembers }, status: { $in: ['approved', 'validated'] } });
       res.json({
         users: teamMembers.length,
         teams: 1,
@@ -42,7 +42,7 @@ router.get('/dashboard', auth, async function (req, res) {
       var [usersCount, teamsCount, objectivesCount, cyclesCount] = await Promise.all([
         User.countDocuments(),
         Team.countDocuments(),
-        Objective.countDocuments(),
+        Objective.countDocuments({ status: { $in: ['approved', 'validated'] } }),
         Cycle.countDocuments()
       ]);
       res.json({

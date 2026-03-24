@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../../services/api';
 import { useAuth } from '../AuthContext';
-
-var API = 'http://localhost:5000';
 
 function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoals, existingObjectives }) {
     var { user } = useAuth();
@@ -31,20 +29,15 @@ function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoal
         if (user.role === 'TEAM_LEADER' || user.role === 'ADMIN' || user.role === 'HR') {
             const fetchAssignmentData = async () => {
                 try {
-                    const token = localStorage.getItem('token');
-                    if (token) {
-                        const res = await axios.get(API + '/api/teams', {
-                            headers: { Authorization: `Bearer ${token}` }
-                        });
-                        const teamsData = res.data;
-                        setAvailableTeams(teamsData);
+                    const res = await api.get('/api/teams');
+                    const teamsData = res.data;
+                    setAvailableTeams(teamsData);
                         
                         let usersMap = new Map();
                         teamsData.forEach(t => {
                             if (t.members) t.members.forEach(m => usersMap.set(m._id, m));
                         });
                         setAvailableUsers(Array.from(usersMap.values()));
-                    }
                 } catch (err) {
                     console.error("Failed to fetch assignment data", err);
                 }
@@ -74,11 +67,10 @@ function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoal
         e.preventDefault();
         setLoading(true);
         try {
-            var token = localStorage.getItem('token');
-            var res = await axios.post(API + '/api/ai/generate-goal', {
+            var res = await api.post('/api/ai/generate-goal', {
                 department: user.department || 'General',
                 context: form.title || ''
-            }, { headers: { Authorization: `Bearer ${token}` } });
+            });
             
             var suggestedWeight = Math.min(res.data.weight || 20, remainingWeight);
             setForm(prev => ({
@@ -124,7 +116,7 @@ function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoal
                 targetUser: form.targetUser || null,
                 targetTeam: form.targetTeam || null
             };
-            await axios.post(API + '/api/objectives', payload);
+            await api.post('/api/objectives', payload);
             if (onCreated) onCreated();
             onClose();
         } catch (err) {
@@ -145,153 +137,133 @@ function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoal
                 {error && <div className="goal-modal__error">{error}</div>}
 
                 <form className="goal-modal__form" onSubmit={handleSubmit}>
-                    {/* Bug 6 fix: Prominent Goal Type selector */}
-                    <div className="goal-modal__field">
-                        <label>Goal Type *</label>
-                        <div className="goal-type-selector">
-                            <div
-                                className={'goal-type-card' + (form.category === 'individual' ? ' goal-type-card--active' : '')}
-                                onClick={function() { handleChange('category', 'individual'); }}
-                            >
-                                <div className="goal-type-card__icon">🧑</div>
-                                <div className="goal-type-card__label">Individual Goal</div>
-                                <div className="goal-type-card__desc">Assigned to a specific person</div>
+                    <div className="goal-modal__split-layout" style={{ display: 'grid', gridTemplateColumns: '1.5fr 1fr', gap: '2rem' }}>
+                        
+                        {/* LEFT COLUMN: Main Info */}
+                        <div className="goal-modal__main-info">
+                            <div className="goal-modal__field">
+                                <label>Goal Type *</label>
+                                <div className="goal-type-selector" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                                    <div
+                                        className={'goal-type-card' + (form.category === 'individual' ? ' goal-type-card--active' : '')}
+                                        onClick={function() { handleChange('category', 'individual'); }}
+                                        style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+                                    >
+                                        <div style={{ fontSize: '1.5rem' }}>🧑</div>
+                                        <div style={{ fontWeight: 'bold' }}>Individual</div>
+                                    </div>
+                                    {(user.role === 'TEAM_LEADER' || user.role === 'ADMIN') && (
+                                        <div
+                                            className={'goal-type-card' + (form.category === 'team' ? ' goal-type-card--active' : '')}
+                                            onClick={function() { handleChange('category', 'team'); }}
+                                            style={{ padding: '1rem', border: '1px solid var(--border-color)', borderRadius: '12px', cursor: 'pointer', textAlign: 'center' }}
+                                        >
+                                            <div style={{ fontSize: '1.5rem' }}>👥</div>
+                                            <div style={{ fontWeight: 'bold' }}>Team</div>
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                            {(user.role === 'TEAM_LEADER' || user.role === 'ADMIN') && (
-                                <div
-                                    className={'goal-type-card' + (form.category === 'team' ? ' goal-type-card--active' : '')}
-                                    onClick={function() { handleChange('category', 'team'); }}
-                                >
-                                    <div className="goal-type-card__icon">👥</div>
-                                    <div className="goal-type-card__label">Team Goal</div>
-                                    <div className="goal-type-card__desc">Distributed to all team members</div>
+
+                            <div className="goal-modal__field">
+                                <label>Goal Title *</label>
+                                <div style={{ display: 'flex', gap: '8px' }}>
+                                    <input type="text" value={form.title} onChange={function (e) { handleChange('title', e.target.value); }} placeholder="e.g. Achieve Company Growth" required minLength={5} maxLength={100} style={{ flex: 1 }} />
+                                    <button type="button" onClick={handleAIGenerate} disabled={loading} className="btn btn--secondary btn--sm" title="Let AI write a SMART goal for you">
+                                        ✨ AI Assist
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div className="goal-modal__field">
+                                <label>What does success look like? (Success Indicator)</label>
+                                <textarea value={form.successIndicator} onChange={function (e) { handleChange('successIndicator', e.target.value); }} placeholder="SMART criteria..." rows={2} minLength={10}></textarea>
+                            </div>
+
+                            <div className="goal-modal__field">
+                                <label>Description (Optional)</label>
+                                <textarea value={form.description} onChange={function (e) { handleChange('description', e.target.value); }} placeholder="Describe this goal..." rows={4}></textarea>
+                            </div>
+                        </div>
+
+                        {/* RIGHT COLUMN: Metadata & Settings */}
+                        <div className="goal-modal__side-info" style={{ background: 'var(--bg-main)', padding: '1.5rem', borderRadius: '16px', border: '1px solid var(--border-color)' }}>
+                            <div className="goal-modal__field">
+                                <label>Evaluation Cycle *</label>
+                                <select value={form.cycle} onChange={function (e) { handleChange('cycle', e.target.value); }} required>
+                                    <option value="">Select Cycle</option>
+                                    {cycles.map(function (c) { return <option key={c._id} value={c._id}>{c.name} ({c.year})</option>; })}
+                                </select>
+                            </div>
+
+                            <div className="goal-modal__field">
+                                <label>Initial Status</label>
+                                <select value={form.goalStatus} onChange={function (e) { handleChange('goalStatus', e.target.value); }}>
+                                    <option value="no_status">No Status</option>
+                                    <option value="on_track">On Track</option>
+                                    <option value="at_risk">At Risk</option>
+                                    <option value="off_track">Off Track</option>
+                                </select>
+                            </div>
+
+                            {(user.role === 'TEAM_LEADER' || user.role === 'ADMIN' || user.role === 'HR') && (
+                                <div className="goal-modal__field">
+                                    <label>{form.category === 'individual' ? 'Assign To' : 'Target Team'}</label>
+                                    {form.category === 'individual' ? (
+                                        <select value={form.targetUser} onChange={function (e) { handleChange('targetUser', e.target.value); }}>
+                                            <option value="">Myself</option>
+                                            {availableUsers.map(function (u) { return <option key={u._id} value={u._id}>{u.name}</option>; })}
+                                        </select>
+                                    ) : (
+                                        <select value={form.targetTeam} onChange={function (e) { handleChange('targetTeam', e.target.value); }} required={form.category === 'team'}>
+                                            <option value="">Select Team</option>
+                                            {availableTeams.map(function (t) { return <option key={t._id} value={t._id}>{t.name}</option>; })}
+                                        </select>
+                                    )}
                                 </div>
                             )}
-                        </div>
-                    </div>
 
-                    <div className="goal-modal__field">
-                        <label>Goal Title *</label>
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                            <input type="text" value={form.title} onChange={function (e) { handleChange('title', e.target.value); }} placeholder="e.g. Achieve Company Growth" required minLength={5} maxLength={100} style={{ flex: 1 }} />
-                            <button type="button" onClick={handleAIGenerate} disabled={loading} className="goal-modal__ai-btn" title="Let AI write a SMART goal for you based on title/department">
-                                ✨ AI Assist
-                            </button>
-                        </div>
-                    </div>
+                            <div className="goal-modal__row" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                                <div className="goal-modal__field">
+                                    <label>Start Date</label>
+                                    <input type="date" value={form.startDate} onChange={function (e) { handleChange('startDate', e.target.value); }} />
+                                </div>
+                                <div className="goal-modal__field">
+                                    <label>Due Date</label>
+                                    <input type="date" value={form.deadline} onChange={function (e) { handleChange('deadline', e.target.value); }} />
+                                </div>
+                            </div>
 
-                    <div className="goal-modal__field">
-                        <label>Description</label>
-                        <textarea value={form.description} onChange={function (e) { handleChange('description', e.target.value); }} placeholder="Describe this goal..." rows={3}></textarea>
-                    </div>
-
-                    <div className="goal-modal__field">
-                        <label>Success Indicator (SMART)</label>
-                        <textarea value={form.successIndicator} onChange={function (e) { handleChange('successIndicator', e.target.value); }} placeholder="What does success look like? (min 10 chars)" rows={2} minLength={10}></textarea>
-                    </div>
-
-                    <div className="goal-modal__row">
-                        <div className="goal-modal__field">
-                            <label>Cycle *</label>
-                            <select value={form.cycle} onChange={function (e) { handleChange('cycle', e.target.value); }} required>
-                                <option value="">Select Cycle</option>
-                                {cycles.map(function (c) { return <option key={c._id} value={c._id}>{c.name} ({c.year})</option>; })}
-                            </select>
-                        </div>
-                        <div className="goal-modal__field">
-                            <label>Initial Status</label>
-                            <select value={form.goalStatus} onChange={function (e) { handleChange('goalStatus', e.target.value); }}>
-                                <option value="no_status">No Status</option>
-                                <option value="on_track">On Track</option>
-                                <option value="at_risk">At Risk</option>
-                                <option value="off_track">Off Track</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <div className="goal-modal__row">
-                        {(user.role === 'TEAM_LEADER' || user.role === 'ADMIN' || user.role === 'HR') && form.category === 'individual' && (
                             <div className="goal-modal__field">
-                                <label>Assign To (Collaborator)</label>
-                                <select value={form.targetUser} onChange={function (e) { handleChange('targetUser', e.target.value); }}>
-                                    <option value="">Myself</option>
-                                    {availableUsers.map(function (u) { return <option key={u._id} value={u._id}>{u.name}</option>; })}
+                                <label>Weight: {form.weight}%</label>
+                                <input type="range" min="1" max={maxWeight || 1} value={form.weight} onChange={function (e) { handleChange('weight', e.target.value); }} style={{ width: '100%' }} />
+                                <div style={{ fontSize: '0.75rem', marginTop: '4px', textAlign: 'right', color: 'var(--text-muted)' }}>
+                                    Remaining: {remainingWeight}%
+                                </div>
+                            </div>
+
+                            <div className="goal-modal__field">
+                                <label>Priority Labels</label>
+                                <input type="text" value={form.labels} onChange={function (e) { handleChange('labels', e.target.value); }} placeholder="e.g. High, Q1" />
+                            </div>
+
+                            <div className="goal-modal__field">
+                                <label>Visibility</label>
+                                <select value={form.visibility} onChange={function (e) { handleChange('visibility', e.target.value); }}>
+                                    <option value="public">Public (Shared)</option>
+                                    <option value="team">Team Only</option>
+                                    <option value="department">Dept Only</option>
+                                    <option value="private">Private</option>
                                 </select>
                             </div>
-                        )}
-                        {(user.role === 'TEAM_LEADER' || user.role === 'ADMIN' || user.role === 'HR') && form.category === 'team' && (
-                            <div className="goal-modal__field">
-                                <label>Target Team *</label>
-                                <select value={form.targetTeam} onChange={function (e) { handleChange('targetTeam', e.target.value); }} required={form.category === 'team'}>
-                                    <option value="">Select Team</option>
-                                    {availableTeams
-                                      .filter(function(t) { return user.role === 'ADMIN' || user.role === 'HR' || t.leader?._id === user.id; })
-                                      .map(function (t) { return <option key={t._id} value={t._id}>{t.name}</option>; })}
-                                </select>
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="goal-modal__row">
-                        <div className="goal-modal__field">
-                            <label>Start Date</label>
-                            <input type="date" value={form.startDate} onChange={function (e) { handleChange('startDate', e.target.value); }} />
-                        </div>
-                        <div className="goal-modal__field">
-                            <label>End Date</label>
-                            <input type="date" value={form.deadline} onChange={function (e) { handleChange('deadline', e.target.value); }} />
                         </div>
                     </div>
 
-                    {/* Bug 7 fix: Smart weight system */}
-                    <div className="goal-modal__field">
-                        <label>Weight: {form.weight}%</label>
-                        <input type="range" min="1" max={maxWeight || 1} value={Math.min(form.weight, maxWeight)} onChange={function (e) { handleChange('weight', e.target.value); }} />
-                        <div className="weight-capacity-bar">
-                            <div className="weight-capacity-bar__track">
-                                <div className="weight-capacity-bar__used" style={{ width: usedWeight + '%' }}></div>
-                                <div className="weight-capacity-bar__new" style={{ width: Math.min(form.weight, remainingWeight) + '%', left: usedWeight + '%' }}></div>
-                            </div>
-                            <div className="weight-capacity-bar__labels">
-                                <span>Used: {usedWeight}%</span>
-                                <span>New: {form.weight}%</span>
-                                <span>Remaining: {Math.max(0, remainingWeight - form.weight)}%</span>
-                            </div>
-                        </div>
-                        {parseInt(form.weight) > remainingWeight && (
-                            <div className="weight-warning">⚠️ Weight exceeds remaining capacity ({remainingWeight}% available)</div>
-                        )}
-                    </div>
-
-                    <div className="goal-modal__row">
-                        <div className="goal-modal__field">
-                            <label>Labels (comma-separated)</label>
-                            <input type="text" value={form.labels} onChange={function (e) { handleChange('labels', e.target.value); }} placeholder="e.g. Strategic, High Priority" />
-                        </div>
-                        <div className="goal-modal__field">
-                            <label>Visibility</label>
-                            <select value={form.visibility} onChange={function (e) { handleChange('visibility', e.target.value); }}>
-                                <option value="public">Public</option>
-                                <option value="team">Team</option>
-                                <option value="department">Department</option>
-                                <option value="private">Private</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {parentGoals && parentGoals.length > 0 && (
-                        <div className="goal-modal__field">
-                            <label>Parent Goal</label>
-                            <select value={form.parentObjective} onChange={function (e) { handleChange('parentObjective', e.target.value); }}>
-                                <option value="">None (Top-Level Goal)</option>
-                                {parentGoals.map(function (p) { return <option key={p._id} value={p._id}>{p.title}</option>; })}
-                            </select>
-                        </div>
-                    )}
-
-                    <div className="goal-modal__actions">
-                        <button type="submit" className="goal-modal__submit" disabled={loading || parseInt(form.weight) > remainingWeight}>{loading ? 'Creating...' : 'Create Goal'}</button>
-                        <button type="button" className="goal-modal__cancel" onClick={onClose}>Cancel</button>
+                    <div className="goal-modal__actions" style={{ marginTop: '2rem', display: 'flex', justifyContent: 'flex-end', gap: '1rem', borderTop: '1px solid var(--border-color)', paddingTop: '1.5rem' }}>
+                        <button type="button" className="btn btn--outline" onClick={onClose}>Cancel</button>
+                        <button type="submit" className="btn btn--primary" disabled={loading || parseInt(form.weight) > remainingWeight}>
+                            {loading ? 'Creating...' : 'Create Goal'}
+                        </button>
                     </div>
                 </form>
             </div>

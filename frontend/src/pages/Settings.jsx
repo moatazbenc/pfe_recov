@@ -1,13 +1,16 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../components/AuthContext';
+import UserAvatar from '../components/UserAvatar';
 
 function Settings() {
-  const { user } = useAuth();
+  const { user, updateUser } = useAuth();
   const [notifTitle, setNotifTitle] = useState('');
   const [notifMessage, setNotifMessage] = useState('');
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef(null);
 
   var API = 'http://localhost:5000';
 
@@ -46,6 +49,30 @@ function Settings() {
     }
   }
 
+  async function handleAvatarChange(e) {
+    if (!e.target.files || e.target.files.length === 0) return;
+    const file = e.target.files[0];
+    const formData = new FormData();
+    formData.append('avatar', file);
+
+    setUploading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const res = await axios.put(`${API}/api/users/${user._id}/avatar`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      updateUser(res.data);
+      setSuccess('Profile picture updated successfully!');
+    } catch (err) {
+      setError(err.response?.data?.message || 'Failed to upload profile picture');
+    } finally {
+      setUploading(false);
+      e.target.value = '';
+    }
+  }
+
   function getRoleBadgeColor(role) {
     if (role === 'admin') return '#e74c3c';
     if (role === 'manager') return '#3498db';
@@ -65,6 +92,16 @@ function Settings() {
         <div className="settings-section">
           <h2>👤 Profile Information</h2>
           <div className="profile-info">
+            <div className="profile-item" style={{ alignItems: 'flex-start' }}>
+              <span className="profile-label">Avatar:</span>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <UserAvatar user={user} size={80} style={{ border: '2px solid #e2e8f0' }} />
+                <input type="file" accept="image/*" onChange={handleAvatarChange} ref={fileInputRef} style={{ display: 'none' }} />
+                <button onClick={function() { fileInputRef.current.click(); }} disabled={uploading} style={{ padding: '6px 12px', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '6px', fontSize: '0.8rem', cursor: 'pointer', width: 'fit-content' }}>
+                  {uploading ? 'Uploading...' : 'Change Picture'}
+                </button>
+              </div>
+            </div>
             <div className="profile-item">
               <span className="profile-label">Name:</span>
               <span className="profile-value">{user.name}</span>

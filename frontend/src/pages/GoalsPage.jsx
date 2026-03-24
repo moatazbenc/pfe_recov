@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
+import { useToast } from '../components/common/Toast';
+import ConfirmDialog from '../components/common/ConfirmDialog';
 import GoalFilters from '../components/goals/GoalFilters';
 import GoalProgressSummary from '../components/goals/GoalProgressSummary';
 import GoalTable from '../components/goals/GoalTable';
 import GoalDetailsPanel from '../components/goals/GoalDetailsPanel';
 import CreateGoalModal from '../components/goals/CreateGoalModal';
 import EditGoalModal from '../components/goals/EditGoalModal';
+import ManagerReviewModal from '../components/goals/ManagerReviewModal';
+import EvaluateGoalModal from '../components/goals/EvaluateGoalModal';
 import ViewSwitcher from '../components/goals/ViewSwitcher';
-
-var API = 'http://localhost:5000';
 
 function GoalsPage() {
     var { user } = useAuth();
@@ -22,31 +24,27 @@ function GoalsPage() {
     var [activeTab, setActiveTab] = useState('my');
     var [activeView, setActiveView] = useState('list');
     var [statusFilter, setStatusFilter] = useState(null);
+    var [workflowFilter, setWorkflowFilter] = useState(null);
     var [searchTerm, setSearchTerm] = useState('');
     var [selectedGoal, setSelectedGoal] = useState(null);
     var [showCreateModal, setShowCreateModal] = useState(false);
     var [loading, setLoading] = useState(true);
-
-    // Edit/Delete modales
     var [showEditModal, setShowEditModal] = useState(false);
     var [editingObjective, setEditingObjective] = useState(null);
+    var [showDeleteDialog, setShowDeleteDialog] = useState(false);
     var [deletingObjective, setDeletingObjective] = useState(null);
+    var [reviewGoal, setReviewGoal] = useState(null);
+    var [evaluateGoal, setEvaluateGoal] = useState(null);
+    var [showSubmitDialog, setShowSubmitDialog] = useState(false);
 
-    var [error, setError] = useState('');
-    var [success, setSuccess] = useState('');
+    var toast = useToast();
 
     useEffect(function () { fetchCycles(); }, []);
     useEffect(function () { fetchObjectives(); }, [selectedCycle, activeTab]);
-    useEffect(function () {
-        if (success) { var t = setTimeout(function () { setSuccess(''); }, 3000); return function () { clearTimeout(t); }; }
-    }, [success]);
-    useEffect(function () {
-        if (error) { var t = setTimeout(function () { setError(''); }, 5000); return function () { clearTimeout(t); }; }
-    }, [error]);
 
     async function fetchCycles() {
         try {
-            var res = await axios.get(API + '/api/cycles');
+            var res = await api.get('/api/cycles');
             setCycles(res.data);
             var active = res.data.filter(function (c) { return c.status === 'active'; });
             if (active.length > 0) setSelectedCycle(active[0]._id);
@@ -59,43 +57,55 @@ function GoalsPage() {
             var result = [];
             var indArr = [];
             var tmArr = [];
-            if (activeTab === 'my') {
+            if (activeTab === 'pending') {
+                var pendingRes = await api.get('/api/objectives/pending-validation');
+                var pendingData = Array.isArray(pendingRes.data) ? pendingRes.data : (pendingRes.data.objectives || []);
+                indArr = pendingData; tmArr = [];
+                setIndividualObjectives(indArr); setTeamObjectives(tmArr); setValidation(null);
+                result = indArr;
+            } else if (activeTab === 'change_requests') {
+                var crRes = await api.get('/api/objectives/pending-change-requests');
+                var crData = crRes.data.objectives || [];
+                indArr = crData; tmArr = [];
+                setIndividualObjectives(indArr); setTeamObjectives(tmArr); setValidation(null);
+                result = indArr;
+            } else if (activeTab === 'awaiting_eval') {
+                var evalRes = await api.get('/api/objectives/completed-awaiting-evaluation');
+                var evalData = evalRes.data.objectives || [];
+                indArr = evalData; tmArr = [];
+                setIndividualObjectives(indArr); setTeamObjectives(tmArr); setValidation(null);
+                result = indArr;
+            } else if (activeTab === 'my') {
                 if (selectedCycle) {
-                    var structRes = await axios.get(API + '/api/objectives/user/' + user._id + '/cycle/' + selectedCycle);
+                    var structRes = await api.get('/api/objectives/user/' + user._id + '/cycle/' + selectedCycle);
                     indArr = structRes.data.individualObjectives || [];
                     tmArr = structRes.data.teamObjectives || [];
-                    setIndividualObjectives(indArr);
-                    setTeamObjectives(tmArr);
+                    setIndividualObjectives(indArr); setTeamObjectives(tmArr);
                     setValidation(structRes.data.validation || null);
-                    result = indArr; // Only individual goals in 'My Goals'
+                    result = indArr;
                 } else {
-                    var res = await axios.get(API + '/api/objectives/my');
+                    var res = await api.get('/api/objectives/my');
                     var data = res.data;
                     var allData = Array.isArray(data) ? data : (data.objectives || []);
                     indArr = allData.filter(function (o) { return o.category !== 'team'; });
                     tmArr = allData.filter(function (o) { return o.category === 'team'; });
-                    setIndividualObjectives(indArr);
-                    setTeamObjectives(tmArr);
-                    setValidation(null);
-                    result = indArr; // Only individual goals in 'My Goals'
+                    setIndividualObjectives(indArr); setTeamObjectives(tmArr); setValidation(null);
+                    result = indArr;
                 }
             } else {
                 var params = {};
                 if (selectedCycle) params.cycle = selectedCycle;
                 if (activeTab === 'team') params.scope = 'team';
-                var res2 = await axios.get(API + '/api/objectives', { params: params });
+                var res2 = await api.get('/api/objectives', { params: params });
                 var data2 = res2.data;
                 var allData2 = [];
                 if (data2.objectives) { allData2 = data2.objectives; }
                 else if (data2.individualObjectives || data2.teamObjectives) { allData2 = [].concat(data2.individualObjectives || [], data2.teamObjectives || []); }
                 else if (Array.isArray(data2)) { allData2 = data2; }
-                
                 indArr = allData2.filter(function (o) { return o.category !== 'team'; });
                 tmArr = allData2.filter(function (o) { return o.category === 'team'; });
-                setIndividualObjectives(indArr);
-                setTeamObjectives(tmArr);
-                setValidation(null);
-                result = tmArr; // Only team goals in 'Team' page
+                setIndividualObjectives(indArr); setTeamObjectives(tmArr); setValidation(null);
+                result = activeTab === 'team' ? tmArr : allData2;
             }
             setObjectives(result);
         } catch (err) {
@@ -104,72 +114,49 @@ function GoalsPage() {
         } finally { setLoading(false); }
     }
 
-    // ---- CRUD ----
-    function openDeleteModal(id) {
-        setDeletingObjective(id);
-    }
-
+    function openDeleteModal(id) { setDeletingObjective(id); setShowDeleteDialog(true); }
     async function handleDeleteConfirm() {
         if (!deletingObjective) return;
         try {
-            await axios.delete(API + '/api/objectives/' + deletingObjective);
-            setSuccess('Goal deleted successfully!');
+            await api.delete('/api/objectives/' + deletingObjective);
+            toast.success('Goal deleted successfully!');
             if (selectedGoal && selectedGoal._id === deletingObjective) setSelectedGoal(null);
-            setDeletingObjective(null);
-            fetchObjectives();
-        } catch (err) { setError(err.response?.data?.message || 'Failed to delete'); }
+            setDeletingObjective(null); setShowDeleteDialog(false); fetchObjectives();
+        } catch (err) { toast.error(err.response?.data?.message || 'Failed to delete'); setShowDeleteDialog(false); }
     }
-
     async function handleDuplicate(id) {
-        try {
-            await axios.post(API + '/api/objectives/' + id + '/duplicate');
-            setSuccess('Goal duplicated!');
-            fetchObjectives();
-        } catch (err) { setError(err.response?.data?.message || 'Failed to duplicate'); }
+        try { await api.post('/api/objectives/' + id + '/duplicate'); toast.success('Goal duplicated!'); fetchObjectives(); }
+        catch (err) { toast.error(err.response?.data?.message || 'Failed to duplicate'); }
     }
+    function openEditModal(obj) { setEditingObjective(obj); setShowEditModal(true); }
+    function onGoalUpdated() { toast.success('Goal updated successfully!'); fetchObjectives(); }
 
-    function openEditModal(obj) {
-        setEditingObjective(obj);
-        setShowEditModal(true);
-    }
-
-    function onGoalUpdated() {
-        setSuccess('Goal updated successfully!');
-        fetchObjectives();
-    }
-
-    // ---- Helpers ----
     var rejectedCount = validation ? (validation.totalRejected || 0) : 0;
-    var filteredObjectives = statusFilter
-        ? objectives.filter(function (o) { return (o.goalStatus || 'no_status') === statusFilter; })
-        : objectives;
-        
+
+    // Apply filters
+    var filteredObjectives = objectives;
+    if (statusFilter) filteredObjectives = filteredObjectives.filter(function (o) { return (o.goalStatus || 'no_status') === statusFilter; });
+    if (workflowFilter) filteredObjectives = filteredObjectives.filter(function (o) { return o.status === workflowFilter; });
     if (searchTerm) {
         var lower = searchTerm.toLowerCase();
-        filteredObjectives = filteredObjectives.filter(function(o) { 
-            return (o.title && o.title.toLowerCase().includes(lower)) || 
+        filteredObjectives = filteredObjectives.filter(function(o) {
+            return (o.title && o.title.toLowerCase().includes(lower)) ||
                    (o.description && o.description.toLowerCase().includes(lower)) ||
-                   (o.category && o.category.toLowerCase().includes(lower)) ||
-                   (o.owner && o.owner.name && o.owner.name.toLowerCase().includes(lower))
+                   (o.owner && o.owner.name && o.owner.name.toLowerCase().includes(lower));
         });
     }
 
-    // ---- Submission Logic ----
-    var isDraftCycle = individualObjectives.length > 0 && individualObjectives.every(function (o) { return o.status === 'draft' || o.status === 'rejected'; });
-    var totalWeight = individualObjectives.reduce(function (sum, o) { return sum + (o.weight || 0); }, 0);
-    var validCount = individualObjectives.length >= 3 && individualObjectives.length <= 10;
+    var unapprovedObjectives = individualObjectives.filter(function(o) { return !['approved', 'validated'].includes(o.status); });
+    var isDraftCycle = unapprovedObjectives.length > 0 && unapprovedObjectives.every(function (o) { return o.status === 'draft' || o.status === 'rejected'; });
+    var totalWeight = unapprovedObjectives.reduce(function (sum, o) { return sum + (o.weight || 0); }, 0);
+    var validCount = unapprovedObjectives.length >= 3 && unapprovedObjectives.length <= 10;
     var canSubmit = validCount && totalWeight === 100 && isDraftCycle;
 
     async function handleSubmitCycle() {
-        if (!window.confirm('Submit these goals? Once submitted, they cannot be structurally edited.')) return;
         try {
-            var token = localStorage.getItem('token');
-            await axios.post(API + '/api/objectives/submit', { cycle: selectedCycle }, { headers: { Authorization: `Bearer ${token}` } });
-            setSuccess('Goals submitted successfully!');
-            fetchObjectives();
-        } catch (err) {
-            setError(err.response?.data?.message || 'Failed to submit goals.');
-        }
+            await api.post('/api/objectives/submit', { cycle: selectedCycle });
+            toast.success('Goals submitted for approval!'); setShowSubmitDialog(false); fetchObjectives();
+        } catch (err) { toast.error(err.response?.data?.message || 'Failed to submit goals.'); setShowSubmitDialog(false); }
     }
 
     function getGroupedByUser() {
@@ -181,6 +168,9 @@ function GoalsPage() {
         });
         return Object.values(groups);
     }
+
+    function handleValidate(obj) { setReviewGoal(obj); }
+    function handleEvaluate(obj) { setEvaluateGoal(obj); }
 
     return (
         <div className="goals-page">
@@ -199,14 +189,11 @@ function GoalsPage() {
                 </div>
             </div>
 
-            <GoalFilters 
-                activeTab={activeTab} 
-                onTabChange={setActiveTab} 
-                cycles={cycles} 
-                selectedCycle={selectedCycle} 
-                onCycleChange={setSelectedCycle} 
-                searchTerm={searchTerm}
-                onSearchChange={setSearchTerm}
+            <GoalFilters
+                activeTab={activeTab} onTabChange={function(tab) { setActiveTab(tab); setStatusFilter(null); setWorkflowFilter(null); }}
+                cycles={cycles} selectedCycle={selectedCycle} onCycleChange={setSelectedCycle}
+                searchTerm={searchTerm} onSearchChange={setSearchTerm}
+                workflowFilter={workflowFilter} onWorkflowFilter={setWorkflowFilter}
             />
             <GoalProgressSummary objectives={objectives} statusFilter={statusFilter} onStatusFilter={setStatusFilter} />
 
@@ -215,18 +202,12 @@ function GoalsPage() {
                     <div>
                         <h3 style={{ margin: '0 0 10px 0', fontSize: '1.2rem', color: '#1e293b' }}>🚀 Goal Submission</h3>
                         <div style={{ display: 'flex', gap: '20px', fontSize: '0.95rem' }}>
-                            <div style={{ color: totalWeight === 100 ? '#27ae60' : '#e74c3c' }}>
-                                <strong>Weight Capacity:</strong> {totalWeight}% / 100%
-                            </div>
-                            <div style={{ color: validCount ? '#27ae60' : '#e74c3c' }}>
-                                <strong>Goals Count:</strong> {individualObjectives.length} (Req: 3-10)
-                            </div>
+                            <div style={{ color: totalWeight === 100 ? '#27ae60' : '#e74c3c' }}><strong>Weight Capacity:</strong> {totalWeight}% / 100%</div>
+                            <div style={{ color: validCount ? '#27ae60' : '#e74c3c' }}><strong>Goals Count:</strong> {unapprovedObjectives.length} (Req: 3-10)</div>
                         </div>
                     </div>
                     {canSubmit && (
-                        <button onClick={handleSubmitCycle} style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>
-                            Submit Goals
-                        </button>
+                        <button onClick={handleSubmitCycle} style={{ backgroundColor: '#3b82f6', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '6px', cursor: 'pointer', fontWeight: 'bold' }}>Submit Goals</button>
                     )}
                 </div>
             )}
@@ -234,9 +215,7 @@ function GoalsPage() {
             {activeTab === 'my' && validation && (
                 <div className="validation-panel">
                     <h3>📊 Score Summary</h3>
-                    <div className="validation-panel__formula">
-                        <strong>Formula:</strong> Final Score = (Individual Score × 70%) + (Team Score × 30%) = max 100
-                    </div>
+                    <div className="validation-panel__formula"><strong>Formula:</strong> Final Score = (Individual Score × 70%) + (Team Score × 30%) = max 100</div>
                     <div className="validation-panel__grid">
                         <div className="validation-panel__box">
                             <h4>Individual (70%)</h4>
@@ -267,15 +246,10 @@ function GoalsPage() {
                 </div>
             )}
 
-            {error && <div className="error-message">{error}</div>}
-            {success && <div className="success-message">{success}</div>}
             {rejectedCount > 0 && (
                 <div className="rejected-banner">
                     <span className="rejected-banner-icon">!</span>
-                    <div className="rejected-banner-content">
-                        <strong>Action Required!</strong>
-                        <p>You have {rejectedCount} rejected objective(s) that need revision.</p>
-                    </div>
+                    <div className="rejected-banner-content"><strong>Action Required!</strong><p>You have {rejectedCount} rejected objective(s) that need revision.</p></div>
                 </div>
             )}
 
@@ -291,6 +265,9 @@ function GoalsPage() {
                             onDelete={openDeleteModal}
                             onDuplicate={handleDuplicate}
                             onEdit={openEditModal}
+                            onValidate={handleValidate}
+                            showOwner={activeTab !== 'my'}
+                            currentUser={user}
                         />
                     )}
                     {activeView === 'feed' && (
@@ -299,21 +276,12 @@ function GoalsPage() {
                             {filteredObjectives.map(function (obj) {
                                 return (
                                     <div key={obj._id} className="goals-feed-card" onClick={function () { setSelectedGoal(obj); }}>
-                                        <div className="goals-feed-card__header">
-                                            <strong>{obj.owner?.name || 'Unknown'}</strong>
-                                            <span>{new Date(obj.updatedAt || obj.createdAt).toLocaleDateString()}</span>
-                                        </div>
+                                        <div className="goals-feed-card__header"><strong>{obj.owner?.name || 'Unknown'}</strong><span>{new Date(obj.updatedAt || obj.createdAt).toLocaleDateString()}</span></div>
                                         <h4>{obj.title}</h4>
                                         <p>{obj.description || 'No description'}</p>
                                         <div className="goals-feed-card__footer">
                                             <span>{(obj.achievementPercent || 0).toFixed(0)}% complete</span>
-                                            <span className="goals-feed-card__status" style={{ color: obj.goalStatus === 'on_track' ? '#059669' : obj.goalStatus === 'at_risk' ? '#D97706' : '#9CA3AF' }}>
-                                                {obj.goalStatus || 'no status'}
-                                            </span>
-                                        </div>
-                                        <div className="goals-feed-card__actions">
-                                            <button onClick={function (e) { e.stopPropagation(); openEditModal(obj); }}>✏️ Edit</button>
-                                            <button onClick={function (e) { e.stopPropagation(); openDeleteModal(obj._id); }} className="goals-feed-card__delete">🗑️ Delete</button>
+                                            <span className="goals-feed-card__status" style={{ color: obj.goalStatus === 'on_track' ? '#059669' : obj.goalStatus === 'at_risk' ? '#D97706' : '#9CA3AF' }}>{obj.goalStatus || 'no status'}</span>
                                         </div>
                                     </div>
                                 );
@@ -326,14 +294,7 @@ function GoalsPage() {
                                 return (
                                     <div key={i} className="goals-user-group">
                                         <h3 className="goals-user-group__name">👤 {group.name} ({group.goals.length})</h3>
-                                        <GoalTable
-                                            objectives={group.goals}
-                                            onGoalClick={setSelectedGoal}
-                                            onStatusChange={fetchObjectives}
-                                            onDelete={openDeleteModal}
-                                            onDuplicate={handleDuplicate}
-                                            onEdit={openEditModal}
-                                        />
+                                        <GoalTable objectives={group.goals} onGoalClick={setSelectedGoal} onStatusChange={fetchObjectives} onDelete={openDeleteModal} onDuplicate={handleDuplicate} onEdit={openEditModal} onValidate={handleValidate} showOwner={false} />
                                     </div>
                                 );
                             })}
@@ -342,53 +303,26 @@ function GoalsPage() {
                 </div>
             )}
 
-            {/* Goal Details Panel */}
-            {selectedGoal && (
-                <GoalDetailsPanel
-                    goal={selectedGoal}
-                    onClose={function () { setSelectedGoal(null); }}
-                    onRefresh={fetchObjectives}
-                />
-            )}
+            {selectedGoal && <GoalDetailsPanel goal={selectedGoal} onClose={function () { setSelectedGoal(null); }} onRefresh={fetchObjectives} />}
 
-            {/* Create Goal Modal */}
             {showCreateModal && (
-                <CreateGoalModal
-                    onClose={function () { setShowCreateModal(false); }}
-                    onCreated={fetchObjectives}
-                    cycles={cycles}
-                    selectedCycle={selectedCycle}
-                    parentGoals={objectives.filter(function (o) { return !o.parentObjective; })}
-                    existingObjectives={[].concat(individualObjectives, teamObjectives)}
-                />
+                <CreateGoalModal onClose={function () { setShowCreateModal(false); }} onCreated={fetchObjectives} cycles={cycles} selectedCycle={selectedCycle}
+                    parentGoals={objectives.filter(function (o) { return !o.parentObjective; })} existingObjectives={[].concat(individualObjectives, teamObjectives)} />
             )}
 
-            {/* Rich Edit Goal Modal */}
             {showEditModal && editingObjective && (
-                <EditGoalModal
-                    goal={editingObjective}
-                    onClose={function () { setShowEditModal(false); setEditingObjective(null); }}
-                    onUpdated={onGoalUpdated}
-                    cycles={cycles}
-                    parentGoals={objectives.filter(function (o) { return !o.parentObjective; })}
-                    existingObjectives={[].concat(individualObjectives, teamObjectives)}
-                />
+                <EditGoalModal goal={editingObjective} onClose={function () { setShowEditModal(false); setEditingObjective(null); }} onUpdated={onGoalUpdated}
+                    cycles={cycles} parentGoals={objectives.filter(function (o) { return !o.parentObjective; })} existingObjectives={[].concat(individualObjectives, teamObjectives)} />
             )}
 
-            {/* Custom Delete Confirmation Modal */}
-            {deletingObjective && (
-                <div className="goal-modal-overlay" onClick={function () { setDeletingObjective(null); }}>
-                    <div className="delete-confirm-modal" onClick={function (e) { e.stopPropagation(); }}>
-                        <div className="delete-confirm-modal__icon">🗑️</div>
-                        <h3>Delete Goal</h3>
-                        <p>Are you sure you want to delete this goal? This action cannot be undone.</p>
-                        <div className="delete-confirm-modal__actions">
-                            <button className="goal-modal__cancel" onClick={function () { setDeletingObjective(null); }}>Cancel</button>
-                            <button className="delete-confirm-modal__btn" onClick={handleDeleteConfirm}>Delete</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {reviewGoal && <ManagerReviewModal goal={reviewGoal} onClose={function () { setReviewGoal(null); }} onReviewed={fetchObjectives} />}
+            {evaluateGoal && <EvaluateGoalModal goal={evaluateGoal} onClose={function () { setEvaluateGoal(null); }} onEvaluated={fetchObjectives} />}
+
+            <ConfirmDialog open={!!deletingObjective} title="Delete Goal" message="Are you sure you want to delete this goal? This action cannot be undone."
+                confirmLabel="Delete" onConfirm={handleDeleteConfirm} onCancel={function () { setDeletingObjective(null); }} danger />
+
+            <ConfirmDialog open={showSubmitDialog} title="Submit Goals" message="Submit these goals? Once submitted, they cannot be structurally edited."
+                confirmLabel="Submit" onConfirm={handleSubmitCycle} onCancel={function () { setShowSubmitDialog(false); }} />
         </div>
     );
 }
