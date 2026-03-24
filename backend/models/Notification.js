@@ -16,7 +16,8 @@ const notificationSchema = new mongoose.Schema({
             'DEADLINE', 'KPI_DROP', 'MENTION', 'GOAL_UPDATE', 'COMMENT', 'FEEDBACK',
             'GOAL_SUBMITTED', 'GOAL_APPROVED', 'GOAL_REJECTED', 'GOAL_REVISION_REQUESTED',
             'GOAL_ASSIGNED', 'GOAL_ACKNOWLEDGED', 'GOAL_COMPLETED', 'GOAL_EVALUATED',
-            'CHANGE_REQUEST', 'CHANGE_REQUEST_RESOLVED', 'GOAL_CANCELLED'
+            'CHANGE_REQUEST', 'CHANGE_REQUEST_RESOLVED', 'GOAL_CANCELLED',
+            'MEETING_INVITE', 'MEETING_UPDATE'
         ],
         required: true
     },

@@ -94,18 +94,23 @@ router.post('/', rateLimiter, auth, async function (req, res) {
             .populate('attendees', 'name email role')
             .populate('team', 'name');
 
-        if (populated.attendees && populated.attendees.length > 0) {
-            for (const attendee of populated.attendees) {
-                if (String(attendee._id) !== String(req.user.id)) {
-                    await createNotification(
-                        attendee._id,
-                        'New Meeting Scheduled',
-                        `You have been invited to a new meeting: "${title}" by ${populated.organizer.name}.`,
-                        '/meetings',
-                        'MEETING_INVITE'
-                    );
+        // Send notifications (don't fail meeting creation if notifications fail)
+        try {
+            if (populated.attendees && populated.attendees.length > 0) {
+                for (const attendee of populated.attendees) {
+                    if (String(attendee._id) !== String(req.user.id)) {
+                        await createNotification(
+                            attendee._id,
+                            'New Meeting Scheduled',
+                            `You have been invited to a new meeting: "${title}" by ${populated.organizer.name}.`,
+                            '/meetings',
+                            'MEETING_INVITE'
+                        );
+                    }
                 }
             }
+        } catch (notifErr) {
+            console.error('Meeting notification error (non-blocking):', notifErr.message);
         }
 
         res.status(201).json({ success: true, meeting: populated });
@@ -144,21 +149,26 @@ router.put('/:id', rateLimiter, auth, async function (req, res) {
             .populate('team', 'name')
             .populate('relatedObjectives', 'title goalStatus');
 
-        if (populated.attendees && populated.attendees.length > 0) {
-            for (const attendee of populated.attendees) {
-                if (String(attendee._id) !== String(req.user.id)) {
-                    const msg = req.body.status === 'cancelled'
-                        ? `Meeting "${meeting.title}" has been cancelled.`
-                        : `Meeting details updated for "${meeting.title}".`;
-                    await createNotification(
-                        attendee._id,
-                        req.body.status === 'cancelled' ? 'Meeting Cancelled' : 'Meeting Updated',
-                        msg,
-                        '/meetings',
-                        'MEETING_UPDATE'
-                    );
+        // Send notifications (don't fail meeting update if notifications fail)
+        try {
+            if (populated.attendees && populated.attendees.length > 0) {
+                for (const attendee of populated.attendees) {
+                    if (String(attendee._id) !== String(req.user.id)) {
+                        const msg = req.body.status === 'cancelled'
+                            ? `Meeting "${meeting.title}" has been cancelled.`
+                            : `Meeting details updated for "${meeting.title}".`;
+                        await createNotification(
+                            attendee._id,
+                            req.body.status === 'cancelled' ? 'Meeting Cancelled' : 'Meeting Updated',
+                            msg,
+                            '/meetings',
+                            'MEETING_UPDATE'
+                        );
+                    }
                 }
             }
+        } catch (notifErr) {
+            console.error('Meeting update notification error (non-blocking):', notifErr.message);
         }
 
         res.json({ success: true, meeting: populated });
