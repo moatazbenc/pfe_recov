@@ -1,0 +1,5 @@
+backup_v1/
+tmp/
+node_modules/
+.next/
+__deleted__/
