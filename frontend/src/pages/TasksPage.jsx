@@ -26,14 +26,22 @@ function TasksPage() {
 
   useEffect(function () { loadData(); }, [tab]);
 
+  // Ultra-fast 1s polling for "real-time" feel without Sockets
+  useEffect(function () {
+    var interval = setInterval(loadData, 1000);
+    return function () { clearInterval(interval); };
+  }, [tab]);
+
   function loadData() {
-    setLoading(true);
+    // Only show loading for original load to prevent flickering
+    if (tasks.length === 0) setLoading(true); 
     var url = tab === 'my' ? '/api/tasks/my' : tab === 'assigned' ? '/api/tasks/assigned' : '/api/tasks/all';
+    var params = { t: Date.now() };
     Promise.all([
-      api.get(url),
-      api.get('/api/tasks/stats'),
-      api.get('/api/users'),
-      api.get('/api/objectives/my'),
+      api.get(url, { params: params }),
+      api.get('/api/tasks/stats', { params: params }),
+      api.get('/api/users', { params: params }),
+      api.get('/api/objectives/my', { params: params }),
     ]).then(function (res) {
       setTasks(res[0].data.tasks || []);
       setStats(res[1].data.stats || null);
@@ -47,9 +55,25 @@ function TasksPage() {
   function handleCreate() {
     if (!form.title.trim() || !form.assigneeId) return;
     setSending(true);
-    var data = Object.assign({}, form, { labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }) : [] });
+    var data = Object.assign({}, form, { 
+        labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }) : [],
+        linkedGoal: form.linkedGoal || null,
+        dueDate: form.dueDate || null 
+    });
     api.post('/api/tasks', data)
-      .then(function () { setShowForm(false); resetForm(); loadData(); toast.success('Task created!'); })
+      .then(function (res) { 
+        setShowForm(false); 
+        resetForm(); 
+        
+        // Auto-switch tab if I assigned it to someone else so I see it immediately
+        if (data.assigneeId !== user._id && tab !== 'assigned' && tab !== 'all') {
+          setTab('assigned');
+        } else {
+          // Delay to ensure MongoDB consistency
+          setTimeout(loadData, 500); 
+        }
+        toast.success('Task created!'); 
+      })
       .catch(function (e) { toast.error(e.response?.data?.message || 'Error creating task'); })
       .finally(function () { setSending(false); });
   }
@@ -72,9 +96,19 @@ function TasksPage() {
   function handleUpdate() {
     if (!form.title.trim()) return;
     setSending(true);
-    var data = Object.assign({}, form, { labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }) : [] });
+    var data = Object.assign({}, form, { 
+        labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }) : [],
+        linkedGoal: form.linkedGoal || null,
+        dueDate: form.dueDate || null
+    });
     api.put('/api/tasks/' + editingTask, data)
-      .then(function () { setShowForm(false); setEditingTask(null); resetForm(); loadData(); toast.success('Task updated!'); })
+      .then(function () { 
+        setShowForm(false); 
+        setEditingTask(null); 
+        resetForm(); 
+        setTimeout(loadData, 500); 
+        toast.success('Task updated!'); 
+      })
       .catch(function (e) { toast.error(e.response?.data?.message || 'Error updating task'); })
       .finally(function () { setSending(false); });
   }

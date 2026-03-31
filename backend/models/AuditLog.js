@@ -16,12 +16,12 @@ const AuditLogSchema = new mongoose.Schema({
   },
   action: {
     type: String,
-    enum: ['create', 'update', 'delete', 'submit', 'validate', 'reject', 'checkin', 'login', 'export'],
+    enum: ['create', 'update', 'delete', 'submit', 'validate', 'reject', 'checkin', 'login', 'export', 'submitted', 'approved', 'rejected', 'revision_requested', 'midyear_assessed', 'final_evaluated', 'locked', 'unlocked', 'phase_changed', 'review_created', 'review_updated'],
     required: true
   },
   entityType: {
     type: String,
-    enum: ['objective', 'key_result', 'checkin', 'cycle', 'team', 'user', 'hr_decision', 'notification', 'evaluation'],
+    enum: ['objective', 'key_result', 'checkin', 'cycle', 'team', 'user', 'hr_decision', 'notification', 'evaluation', 'goal', 'review', 'goal_review'],
     required: true
   },
   entityId: {

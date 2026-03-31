@@ -16,11 +16,54 @@ router.get('/', rateLimiter, auth, async function (req, res) {
             ]
         };
 
-        if (status) filter.status = status;
+        if (status) {
+            if (status.includes(',')) {
+                filter.status = { $in: status.split(',') };
+            } else {
+                filter.status = status;
+            }
+        }
         if (type) filter.type = type;
         if (team) filter.team = team;
         if (upcoming === 'true') {
-            filter.date = { $gte: new Date() };
+            const today = new Date();
+            today.setHours(0, 0, 0, 0); // Start of today
+            filter.date = { $gte: today };
+        }
+
+        // Auto-complete past meetings that are still "scheduled"
+        const now = new Date();
+        const activeMeetings = await Meeting.find({
+            $or: [{ organizer: req.user.id }, { attendees: req.user.id }],
+            status: { $in: ['scheduled', 'in_progress'] }
+        });
+
+        for (const m of activeMeetings) {
+            let isPast = false;
+            if (m.date) {
+                const meetingDate = new Date(m.date);
+                // If meeting was purely scheduled for a day before today, it's definitely past
+                if (meetingDate < new Date(now.getFullYear(), now.getMonth(), now.getDate())) {
+                    isPast = true;
+                } else if (meetingDate.getFullYear() === now.getFullYear() && 
+                           meetingDate.getMonth() === now.getMonth() && 
+                           meetingDate.getDate() === now.getDate() && 
+                           m.endTime) {
+                    // It's today. Let's check the endTime
+                    const [hours, mins] = m.endTime.split(':').map(Number);
+                    if (!isNaN(hours) && !isNaN(mins)) {
+                        const endDateTime = new Date();
+                        endDateTime.setHours(hours, mins, 0, 0);
+                        if (now > endDateTime) {
+                            isPast = true;
+                        }
+                    }
+                }
+            }
+            if (isPast) {
+                m.status = 'completed';
+                await m.save();
+            }
         }
 
         var meetings = await Meeting.find(filter)

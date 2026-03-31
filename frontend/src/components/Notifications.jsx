@@ -11,7 +11,7 @@ function Notifications() {
 
     useEffect(() => {
         fetchNotifications();
-        const interval = setInterval(fetchNotifications, 60000); // Poll every minute
+        const interval = setInterval(fetchNotifications, 5000); // Poll every 5 seconds for real-time alerts
         return () => clearInterval(interval);
     }, []);
 
@@ -27,7 +27,7 @@ function Notifications() {
 
     const fetchNotifications = async () => {
         try {
-            const res = await axios.get('/api/notifications');
+            const res = await axios.get('/api/notifications', { params: { t: Date.now() } });
             setNotifications(res.data);
             setUnreadCount(res.data.filter(n => !n.isRead).length);
         } catch (err) {
@@ -58,9 +58,19 @@ function Notifications() {
     const getIcon = (type) => {
         switch (type) {
             case 'MENTION': return '👤';
-            case 'DEADLINE': return '⏰';
+            case 'DEADLINE': 
+            case 'DEADLINE_REMINDER':
+            case 'OVERDUE_ALERT': return '⏰';
             case 'KPI_DROP': return '⚠️';
             case 'COMMENT': return '💬';
+            case 'GOAL_SUBMITTED':
+            case 'GOAL_APPROVED':
+            case 'GOAL_REJECTED':
+            case 'GOAL_REVISION_REQUESTED': return '🎯';
+            case 'MIDYEAR_REVIEW_COMPLETED':
+            case 'FINAL_EVALUATION_COMPLETED': return '📝';
+            case 'PHASE_OPENED':
+            case 'PHASE_CLOSED': return '🔄';
             default: return '🔔';
         }
     };

@@ -32,7 +32,7 @@ function AIAssistant() {
             const assistantMsg = { 
                 id: Date.now() + 1, 
                 role: 'assistant', 
-                text: res.data.content || res.data.suggestion || "I'm sorry, I couldn't process that request right now." 
+                text: res.data.result || "I'm sorry, I couldn't process that request right now." 
             };
             setMessages(prev => [...prev, assistantMsg]);
         } catch (err) {
@@ -48,66 +48,63 @@ function AIAssistant() {
     };
 
     return (
-        <div className="ai-assistant-page" style={{ height: 'calc(100vh - 150px)', display: 'flex', flexDirection: 'column' }}>
-            <header style={{ marginBottom: '1.5rem' }}>
-                <h1 style={{ margin: 0 }}>AI Assistant</h1>
-                <p className="text-muted">Get automated suggestions for goals and performance</p>
-            </header>
-
-            <div className="chat-container card shadow-sm" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', padding: 0 }}>
-                <div className="chat-messages" style={{ flex: 1, overflowY: 'auto', padding: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    {messages.map((msg) => (
-                        <div key={msg.id} style={{ 
-                            alignSelf: msg.role === 'user' ? 'flex-end' : 'flex-start',
-                            maxWidth: '70%',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            alignItems: msg.role === 'user' ? 'flex-end' : 'flex-start'
-                        }}>
-                            <div style={{ 
-                                padding: '0.75rem 1rem', 
-                                borderRadius: '12px',
-                                background: msg.role === 'user' ? 'var(--primary)' : 'var(--bg-main)',
-                                color: msg.role === 'user' ? '#000' : 'inherit',
-                                border: '1px solid var(--border-color)',
-                                borderTopRightRadius: msg.role === 'user' ? '2px' : '12px',
-                                borderTopLeftRadius: msg.role === 'assistant' ? '2px' : '12px',
-                                fontSize: '0.95rem',
-                                lineHeight: '1.5',
-                                boxShadow: 'var(--shadow-sm)'
-                            }}>
-                                {msg.text}
-                            </div>
-                        </div>
-                    ))}
-                    {loading && (
-                        <div style={{ alignSelf: 'flex-start', padding: '0.75rem 1rem', borderRadius: '12px', background: 'var(--bg-main)', border: '1px solid var(--border-color)' }}>
-                            <span className="dot-flashing">AI is thinking...</span>
-                        </div>
-                    )}
-                    <div ref={messagesEndRef} />
+        <div className="chat-area" style={{ width: '100%', maxWidth: '900px', margin: '0 auto', flex: 1 }}>
+            
+            {/* Header / Suggestions Area */}
+            <div style={{ padding: '24px 24px 0 24px' }}>
+                <h1 style={{ fontSize: '28px', fontWeight: 'bold', letterSpacing: '-0.5px', marginBottom: '8px' }}>AI Assistant</h1>
+                <p style={{ color: 'var(--apple-text-secondary)', marginBottom: '16px' }}>Get automated suggestions for goals and performance</p>
+                
+                <div style={{ display: 'flex', gap: '8px', overflowX: 'auto', paddingBottom: '8px' }}>
+                    <button className="btn-apple-secondary" onClick={() => setInput("Suggest 3 career development goals")}>Suggest Goals</button>
+                    <button className="btn-apple-secondary" onClick={() => setInput("How can I improve my KPI tracking?")}>Improve KPIs</button>
+                    <button className="btn-apple-secondary" onClick={() => setInput("Help me write a performance update")}>Write Update</button>
                 </div>
+            </div>
 
-                <form className="chat-input" onSubmit={handleSend} style={{ padding: '1.5rem', borderTop: '1px solid var(--border-color)', display: 'flex', gap: '0.75rem' }}>
+            {/* Chat Messages */}
+            <div className="messages-container">
+                {messages.map((msg) => (
+                    <div 
+                        key={msg.id} 
+                        className={`chat-message-bubble ${msg.role === 'user' ? 'chat-message-user' : 'chat-message-ai'}`}
+                    >
+                        {msg.text}
+                    </div>
+                ))}
+                
+                {loading && (
+                    <div className="chat-message-bubble chat-message-ai">
+                        <span style={{ animation: 'blink 1s infinite' }}>●</span>
+                        <span style={{ animation: 'blink 1s infinite', animationDelay: '0.2s', margin: '0 4px' }}>●</span>
+                        <span style={{ animation: 'blink 1s infinite', animationDelay: '0.4s' }}>●</span>
+                    </div>
+                )}
+                <div ref={messagesEndRef} style={{ height: '24px' }} />
+            </div>
+
+            {/* Input Area */}
+            <div className="chat-input-wrapper">
+                <form className="chat-input-box" onSubmit={handleSend}>
                     <input 
+                        className="chat-input-field"
                         type="text" 
                         value={input}
                         onChange={(e) => setInput(e.target.value)}
-                        placeholder="Type your question here (e.g., 'Suggest a SMART goal for learning React')" 
-                        style={{ flex: 1, padding: '0.75rem 1rem', borderRadius: '8px', border: '1px solid var(--border-color)', outline: 'none' }}
+                        placeholder="Type your question here..." 
                         disabled={loading}
                     />
-                    <button type="submit" className="btn btn--primary" disabled={loading}>
-                        Send
+                    <button 
+                        type="submit" 
+                        className="chat-send-btn" 
+                        disabled={loading || !input.trim()}
+                        style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        ↑
                     </button>
                 </form>
             </div>
-
-            <div className="quick-suggestions" style={{ marginTop: '1rem', display: 'flex', gap: '0.5rem', overflowX: 'auto', paddingBottom: '0.5rem' }}>
-                <button className="btn btn--sm btn--outline" onClick={() => setInput("Suggest 3 career development goals")}>Suggest Goals</button>
-                <button className="btn btn--sm btn--outline" onClick={() => setInput("How can I improve my KPI tracking?")}>Improve KPIs</button>
-                <button className="btn btn--sm btn--outline" onClick={() => setInput("Help me write a performance update")}>Write Update</button>
-            </div>
+            
         </div>
     );
 }

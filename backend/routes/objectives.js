@@ -9,18 +9,7 @@ const objectiveController = require('../controllers/objectiveController');
 
 // All users can get objectives
 router.get('/', rateLimiter, auth, objectiveController.getObjectives);
-router.get('/my', rateLimiter, auth, async (req, res) => {
-    try {
-        const Objective = require('../models/Objective');
-        const objectives = await Objective.find({ owner: req.user.id })
-            .populate('owner', 'name email role')
-            .populate('cycle', 'name year status')
-            .populate('assignedBy', 'name email');
-        res.json(objectives);
-    } catch (err) {
-        res.status(500).json({ message: err.message });
-    }
-});
+router.get('/my', rateLimiter, auth, objectiveController.getMyObjectives);
 router.get('/user/:userId/cycle/:cycleId', rateLimiter, auth, async (req, res) => {
     req.query.cycle = req.params.cycleId;
     req.query.targetUserId = req.params.userId;

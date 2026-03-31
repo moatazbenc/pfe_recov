@@ -224,8 +224,8 @@ function ReviewsPage() {
                   </div>
                 </div>
                 <div className="review-item__actions">
-                  {tab === 'my' && (r.status === 'pending' || r.status === 'in_progress') && <button className="btn btn--primary btn--sm" onClick={function () { openConduct(r); }}>Conduct Review</button>}
-                  {tab === 'about' && r.status === 'submitted' && <button className="btn btn--secondary btn--sm" onClick={function () { setShowDetail(r); }}>View Details</button>}
+                  {(tab === 'my' || isAdmin) && (r.status === 'pending' || r.status === 'in_progress') && <button className="btn btn--primary btn--sm" onClick={function () { openConduct(r); }}>Conduct Review</button>}
+                  {(tab === 'about' || isAdmin) && r.status === 'submitted' && <button className="btn btn--secondary btn--sm" onClick={function () { setShowDetail(r); }}>View Details</button>}
                 </div>
               </div>
             );

@@ -54,3 +54,29 @@ exports.notifyTeam = async (team, { senderId, type, title, message, link }) => {
     }
     return notifications;
 };
+
+/**
+ * Notify all active users in the system (for phase open/close broadcasts)
+ */
+exports.notifyAllActiveUsers = async ({ senderId, type, title, message, link }) => {
+    try {
+        const users = await User.find({ isActive: { $ne: false } }).select('_id');
+        const notifications = [];
+        for (const u of users) {
+            if (String(u._id) === String(senderId)) continue;
+            const n = await exports.createNotification({
+                recipientId: u._id,
+                senderId,
+                type,
+                title,
+                message,
+                link,
+            });
+            if (n) notifications.push(n);
+        }
+        return notifications;
+    } catch (err) {
+        console.error('Bulk notification failed:', err.message);
+        return [];
+    }
+};

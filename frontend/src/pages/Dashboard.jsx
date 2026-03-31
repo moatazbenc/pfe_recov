@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import GoalCard from '../components/dashboard/GoalCard';
@@ -20,9 +20,6 @@ function Dashboard() {
   const [performance, setPerformance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userTeams, setUserTeams] = useState([]); // Teams the user belongs to
-  // AI risks removed — AI feature removed
-
-  var API = 'http://localhost:5000';
 
   // Map tab keys to API scope values
   function getScopeFromTab(tab) {
@@ -34,67 +31,48 @@ function Dashboard() {
   async function fetchData(tab) {
     setLoading(true);
     try {
-      var scope = getScopeFromTab(tab);
-      var token = localStorage.getItem('token');
-      var headers = { Authorization: 'Bearer ' + token };
+      const scope = getScopeFromTab(tab);
+      const params = { scope, t: Date.now() };
 
-      // Fetch stats and recent activity scoped to the selected tab
-      var promises = [
-        axios.get(API + '/api/stats/dashboard?scope=' + scope, { headers }),
-        axios.get(API + '/api/stats/recent-activity?scope=' + scope, { headers }),
+      const promises = [
+        api.get('/api/stats/dashboard', { params }),
+        api.get('/api/stats/recent-activity', { params }),
       ];
 
-      // Fetch objectives correctly scoped per tab:
-      //   'me'   -> /api/objectives/my  (only the logged-in user's goals)
-      //   'team' -> /api/objectives?scope=team (team-scoped goals)
-      //   'org'  -> /api/objectives (all goals — admins/HR only useful here)
       if (tab === 'me') {
-        promises.push(axios.get(API + '/api/objectives/my', { headers }));
+        promises.push(api.get('/api/objectives/my', { params: { t: Date.now() } }));
       } else if (tab === 'team') {
-        promises.push(axios.get(API + '/api/objectives?scope=team', { headers }));
+        promises.push(api.get('/api/objectives', { params: { scope: 'team', t: Date.now() } }));
       } else {
-        // org-wide
-        promises.push(axios.get(API + '/api/objectives', { headers }));
+        promises.push(api.get('/api/objectives', { params: { t: Date.now() } }));
       }
 
       if (user.role === 'ADMIN' || user.role === 'HR') {
-        promises.push(axios.get(API + '/api/stats/performance', { headers }));
+        promises.push(api.get('/api/stats/performance', { params: { t: Date.now() } }));
       }
 
-      var results = await Promise.all(promises);
-
+      const results = await Promise.all(promises);
       setStats(results[0].data);
       setRecentActivity(results[1].data);
-      var objs = results[2].data;
-      // Normalise: API can return array, { objectives }, or { individualObjectives, teamObjectives }
-      var objArr = Array.isArray(objs)
-        ? objs
-        : (objs.objectives || (objs.individualObjectives ? [...(objs.individualObjectives || []), ...(objs.teamObjectives || [])] : []));
+      
+      const resData = results[2].data;
+      const objArr = Array.isArray(resData) ? resData : (resData.objectives || resData.individualObjectives || []);
       setObjectives(objArr);
+      
       if (results[3]) setPerformance(results[3].data);
-
-      // Fetch user's teams for the 'My Team' tab context
+      
       if (tab === 'team') {
         try {
-          var teamsRes = await axios.get(API + '/api/teams', { headers });
-          var teamsData = teamsRes.data;
-          var allTeams = Array.isArray(teamsData) ? teamsData : [];
-          // Filter to teams where user is a member or leader
-          var myTeams = allTeams.filter(function(t) {
-            var isLeader = t.leader && (t.leader._id === user._id || t.leader._id === user.id);
-            var isMember = (t.members || []).some(function(m) {
-              return (m._id || m) === (user._id || user.id);
-            });
+          const teamsRes = await api.get('/api/teams', { params: { t: Date.now() } });
+          const allTeams = Array.isArray(teamsRes.data) ? teamsRes.data : (teamsRes.data.teams || []);
+          const myTeams = allTeams.filter(t => {
+            const isLeader = t.leader && (t.leader._id === user.id || t.leader === user.id);
+            const isMember = (t.members || []).some(m => (m._id || m) === user.id);
             return isLeader || isMember;
           });
           setUserTeams(myTeams);
-        } catch (e) {
-          // Collaborators don't have access to /api/teams — gracefully skip
-          setUserTeams([]);
-        }
-      } else {
-        setUserTeams([]);
-      }
+        } catch (e) { setUserTeams([]); }
+      } else { setUserTeams([]); }
     } catch (err) {
       console.error('Fetch dashboard data error:', err);
     } finally {

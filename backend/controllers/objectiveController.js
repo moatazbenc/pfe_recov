@@ -12,9 +12,20 @@ function calculateKpiProgress(kpis) {
     if (kpi.metricType === 'boolean') {
       totalProgress += kpi.currentValue >= 1 ? 100 : 0;
     } else {
-      const range = kpi.targetValue - kpi.initialValue;
-      if (range <= 0) { totalProgress += 100; }
-      else { totalProgress += Math.min(100, Math.max(0, ((kpi.currentValue - kpi.initialValue) / range) * 100)); }
+      const range = Math.abs(kpi.targetValue - kpi.initialValue);
+      if (range === 0) {
+        totalProgress += kpi.currentValue >= kpi.targetValue ? 100 : 0;
+      } else {
+        let progress;
+        if (kpi.targetValue > kpi.initialValue) {
+          // Increase target: (current - initial) / (target - initial)
+          progress = ((kpi.currentValue - kpi.initialValue) / range) * 100;
+        } else {
+          // Decrease target: (initial - current) / (initial - target)
+          progress = ((kpi.initialValue - kpi.currentValue) / range) * 100;
+        }
+        totalProgress += Math.min(100, Math.max(0, progress));
+      }
     }
   });
   return Math.round(totalProgress / kpis.length);
@@ -131,6 +142,17 @@ exports.createObjective = async (req, res) => {
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
 
+// ========== GET MY OBJECTIVES ==========
+exports.getMyObjectives = async (req, res) => {
+  try {
+    const objectives = await Objective.find({ owner: req.user.id })
+      .populate('owner', 'name email role')
+      .populate('cycle', 'name year status')
+      .populate('assignedBy', 'name email');
+    res.json({ success: true, objectives });
+  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
+};
+
 // ========== GET ALL (role-based) ==========
 exports.getObjectives = async (req, res) => {
   try {
@@ -225,7 +247,7 @@ exports.getObjectiveById = async (req, res) => {
 // ========== GET PENDING VALIDATION ==========
 exports.getPendingValidation = async (req, res) => {
   try {
-    if (req.user.role !== 'TEAM_LEADER') return res.status(403).json({ success: false, message: 'Only Team Leaders can fetch pending validations.' });
+    if (req.user.role !== 'TEAM_LEADER' && req.user.role !== 'ADMIN') return res.status(403).json({ success: false, message: 'Only Team Leaders or Admins can fetch pending validations.' });
     const team = await getTeamForLeader(req.user.id);
     if (!team || !team.members || team.members.length === 0) return res.json([]);
     const pending = await Objective.find({
@@ -421,7 +443,7 @@ exports.acknowledgeObjective = async (req, res) => {
   try {
     const objective = await Objective.findById(req.params.id);
     if (!objective) return res.status(404).json({ success: false, message: 'Objective not found.' });
-    if (String(objective.owner) !== String(req.user.id)) return res.status(403).json({ success: false, message: 'Only the assignee can acknowledge.' });
+    if (String(objective.owner) !== String(req.user.id) && req.user.role !== 'ADMIN') return res.status(403).json({ success: false, message: 'Only the assignee or admin can acknowledge.' });
     if (objective.status !== 'assigned') return res.status(400).json({ success: false, message: 'Only assigned goals can be acknowledged.' });
 
     const { accepted, clarificationMessage } = req.body;

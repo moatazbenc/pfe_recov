@@ -161,18 +161,10 @@ const ObjectiveSchema = new mongoose.Schema({
   attachments: [AttachmentSchema],
   changeRequests: [ChangeRequestSchema],
   activityLog: [ActivityLogSchema],
-
-  createdAt: { type: Date, default: Date.now },
-  updatedAt: { type: Date, default: Date.now },
 }, { timestamps: true });
 
 ObjectiveSchema.index({ owner: 1, cycle: 1, title: 1 }, { unique: true });
 ObjectiveSchema.index({ owner: 1, status: 1 });
-
-ObjectiveSchema.pre('save', function (next) {
-  this.updatedAt = new Date();
-  next();
-});
 
 ObjectiveSchema.index({ owner: 1, cycle: 1 });
 ObjectiveSchema.index({ status: 1 });

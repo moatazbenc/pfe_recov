@@ -1,11 +1,10 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from './AuthContext';
 import { useTheme } from './ThemeContext';
 import UserAvatar from './UserAvatar';
 
-function Sidebar() {
-    const [collapsed, setCollapsed] = useState(false);
+function Sidebar({ collapsed, setCollapsed }) {
     const location = useLocation();
     const { user } = useAuth();
     const { darkMode, toggleDarkMode } = useTheme();
@@ -22,18 +21,30 @@ function Sidebar() {
             items: [
                 { path: '/dashboard', label: 'Home', icon: '🏠', roles: null },
                 { path: '/feed', label: 'Feed', icon: '📡', roles: null },
-                // AI Assistant removed — feature removed
-                { path: '/goals', label: 'Goals', icon: '🎯', roles: null },
+                { path: '/ai-assistant', label: 'AI Assistant', icon: '✨', roles: null },
+                { path: '/goals', label: 'Objectives', icon: '🎯', roles: null },
                 { path: '/tasks', label: 'Tasks', icon: '✅', roles: null },
                 { path: '/meetings', label: 'Meetings', icon: '📅', roles: null },
             ],
         },
         {
+            label: 'Annual Cycle',
+            items: [
+                { path: '/admin-dashboard', label: 'Cycle Dashboard', icon: '📊', roles: ['ADMIN', 'HR'] },
+                { path: '/cycles', label: 'Manage Cycles', icon: '🔄', roles: ['ADMIN', 'HR'] },
+                { path: '/annual-goals', label: 'My Goals (P1)', icon: '🎯', roles: null },
+                { path: '/goal-approvals', label: 'Goal Approvals', icon: '📋', roles: ['ADMIN', 'HR', 'TEAM_LEADER', 'MANAGER'] },
+                { path: '/midyear-assessments', label: 'Mid-Year (P2)', icon: '⚖️', roles: null },
+                { path: '/final-evaluations', label: 'End-Year (P3)', icon: '📝', roles: null },
+                { path: '/performance', label: 'Performance', icon: '🏆', roles: null },
+            ],
+        },
+        {
             label: 'People',
             items: [
-                { path: '/my-team', label: 'My Team', icon: '👥', roles: null },
+                { path: '/my-team', label: 'Team Dashboard', icon: '👥', roles: null },
                 { path: '/feedback', label: 'Feedback', icon: '💬', roles: null },
-                { path: '/recognition', label: 'Recognition', icon: '🏆', roles: null },
+                { path: '/recognition', label: 'Recognition', icon: '🌟', roles: null },
                 { path: '/reviews', label: 'Reviews', icon: '📋', roles: null },
                 { path: '/surveys', label: 'Surveys', icon: '📊', roles: null },
             ],
@@ -43,8 +54,6 @@ function Sidebar() {
             items: [
                 { path: '/career', label: 'Career', icon: '🚀', roles: null },
                 { path: '/evaluations', label: 'Evaluations', icon: '📝', roles: null },
-                // Cycles only for privileged roles — collaborators don't need to manage cycles
-                { path: '/cycles', label: 'Cycles', icon: '🔄', roles: ['ADMIN', 'HR', 'TEAM_LEADER'] },
             ],
         },
         {
@@ -52,36 +61,31 @@ function Sidebar() {
             items: [
                 { path: '/validation', label: 'Validation', icon: '✔️', roles: ['ADMIN', 'TEAM_LEADER'] },
                 { path: '/hr-decisions', label: 'HR Decisions', icon: '⚖️', roles: ['ADMIN', 'TEAM_LEADER', 'HR'] },
-                // Teams hidden from COLLABORATORs — principle of least privilege
                 { path: '/teams', label: 'Teams', icon: '👥', roles: ['ADMIN', 'HR', 'TEAM_LEADER'] },
                 { path: '/users', label: 'Users', icon: '👤', roles: ['ADMIN', 'HR'] },
                 { path: '/analytics', label: 'Analytics', icon: '📈', roles: ['ADMIN', 'HR', 'TEAM_LEADER'] },
+                { path: '/audit-logs', label: 'Audit Logs', icon: '🛡️', roles: ['ADMIN', 'HR'] },
                 { path: '/settings', label: 'Settings', icon: '⚙️', roles: null },
             ],
         },
     ];
 
-    const initials = user.name
-        ? user.name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
-        : '??';
-
     return (
-        <aside className={'sidebar' + (collapsed ? ' sidebar--collapsed' : '')}>
-            {/* Brand */}
-            <div className="sidebar__brand">
-                {!collapsed && <span className="sidebar__brand-text">PerfManager</span>}
+        <aside className="apple-sidebar" data-collapsed={collapsed}>
+            {/* Toggle Button for Desktop */}
+            <div style={{ padding: '0 12px', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-end', marginBottom: '8px' }}>
                 <button
-                    className="sidebar__toggle"
                     onClick={() => setCollapsed(!collapsed)}
-                    title={collapsed ? 'Expand' : 'Collapse'}
+                    title={collapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
+                    style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'var(--apple-text-secondary)', padding: '4px' }}
                 >
-                    {collapsed ? '→' : '←'}
+                    {collapsed ? '▶' : '◀'}
                 </button>
             </div>
 
             {/* Navigation */}
-            <nav className="sidebar__nav">
-                {navSections.map(function (section) {
+            <nav style={{ flex: 1 }}>
+                {navSections.map(function (section, index) {
                     const visibleItems = section.items.filter(function (item) {
                         if (!item.roles) return true;
                         return item.roles.includes(user.role);
@@ -89,56 +93,52 @@ function Sidebar() {
                     if (visibleItems.length === 0) return null;
 
                     return (
-                        <div key={section.label} className="sidebar__section">
-                            {!collapsed && <div className="sidebar__section-label">{section.label}</div>}
+                        <div key={section.label}>
+                            <div className="sidebar-section-title">
+                                <span>{section.label}</span>
+                            </div>
+                            
                             {visibleItems.map(item => (
                                 <Link
                                     key={item.path}
                                     to={item.path}
-                                    className={'sidebar__link' + (isActive(item.path) ? ' sidebar__link--active' : '')}
+                                    className={'sidebar-nav-item' + (isActive(item.path) ? ' active' : '')}
                                     title={collapsed ? item.label : ''}
                                 >
-                                    <span className="sidebar__icon">{item.icon}</span>
-                                    {!collapsed && <span className="sidebar__label">{item.label}</span>}
+                                    <span className="sidebar-nav-icon">{item.icon}</span>
+                                    {!collapsed && <span>{item.label}</span>}
                                 </Link>
                             ))}
+                            {index < navSections.length - 1 && <div className="sidebar-divider"></div>}
                         </div>
                     );
                 })}
             </nav>
 
-            {/* User section */}
-            <div className="sidebar__user">
-                <UserAvatar user={user} size={36} />
-                {!collapsed && (
-                    <div className="sidebar__user-info">
-                        <span className="sidebar__user-name">{user.name}</span>
-                        <span className="sidebar__user-role">{user.role}</span>
-                    </div>
-                )}
-            </div>
-
-            {/* Theme Toggle */}
-            <div className="sidebar__theme-toggle" style={{ padding: '12px', borderTop: '1px solid var(--border-color)', display: 'flex', justifyContent: collapsed ? 'center' : 'flex-start' }}>
+            {/* Bottom Actions */}
+            <div style={{ marginTop: 'auto', paddingTop: '16px' }}>
+                <div className="sidebar-divider"></div>
+                
+                {/* Theme Toggle */}
                 <button 
                     onClick={toggleDarkMode}
-                    style={{ 
-                        background: darkMode ? '#FFCB05' : '#f1f5f9', 
-                        color: darkMode ? '#000' : '#64748b',
-                        border: 'none',
-                        padding: '6px 12px',
-                        borderRadius: '20px',
-                        cursor: 'pointer',
-                        fontSize: '0.8rem',
-                        fontWeight: 'bold',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '8px'
-                    }}
+                    className="sidebar-nav-item"
+                    style={{ width: '100%', background: 'transparent', border: 'none', cursor: 'pointer', marginBottom: '8px', padding: '10px 12px' }}
                 >
-                    <span>{darkMode ? '🌙' : '☀️'}</span>
-                    {!collapsed && <span>{darkMode ? 'Retro Mode' : 'Light Mode'}</span>}
+                    <span className="sidebar-nav-icon">{darkMode ? '🌙' : '☀️'}</span>
+                    {!collapsed && <span>{darkMode ? 'Dark Mode' : 'Light Mode'}</span>}
                 </button>
+
+                {/* User Info */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', borderRadius: '8px', backgroundColor: 'var(--apple-bg)' }}>
+                    <UserAvatar user={user} size={32} />
+                    {!collapsed && (
+                        <div style={{ display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+                            <span style={{ fontWeight: '600', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</span>
+                            <span style={{ fontSize: '12px', color: 'var(--apple-text-secondary)' }}>{user.role}</span>
+                        </div>
+                    )}
+                </div>
             </div>
         </aside>
     );

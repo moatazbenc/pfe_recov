@@ -81,18 +81,33 @@ const schemas = {
         create: Joi.object({
             name: Joi.string().required(),
             year: Joi.number().integer().min(2020).max(2100).required(),
-            type: Joi.string().valid('Mid-Year', 'End-Year').required(),
-            evaluationStart: Joi.date().iso().required(),
-            evaluationEnd: Joi.date().iso().required(),
-            status: Joi.string().valid('draft', 'active', 'closed').default('draft')
+            evaluationStart: Joi.date().iso().allow(null, ''),
+            evaluationEnd: Joi.date().iso().allow(null, ''),
+            status: Joi.string().valid('draft', 'open', 'active', 'in_progress', 'closed').default('draft'),
+            phase1Start: Joi.date().iso().allow(null, ''),
+            phase1End: Joi.date().iso().allow(null, ''),
+            phase2Start: Joi.date().iso().allow(null, ''),
+            phase2End: Joi.date().iso().allow(null, ''),
+            phase3Start: Joi.date().iso().allow(null, ''),
+            phase3End: Joi.date().iso().allow(null, ''),
+            currentPhase: Joi.string().valid('phase1', 'phase2', 'phase3', 'closed').default('phase1')
         }),
         update: Joi.object({
             name: Joi.string(),
             year: Joi.number().integer().min(2020).max(2100),
-            type: Joi.string().valid('Mid-Year', 'End-Year'),
-            evaluationStart: Joi.date().iso(),
-            evaluationEnd: Joi.date().iso(),
-            status: Joi.string().valid('draft', 'active', 'closed')
+            evaluationStart: Joi.date().iso().allow(null, ''),
+            evaluationEnd: Joi.date().iso().allow(null, ''),
+            status: Joi.string().valid('draft', 'open', 'active', 'in_progress', 'closed'),
+            phase1Start: Joi.date().iso().allow(null, ''),
+            phase1End: Joi.date().iso().allow(null, ''),
+            phase2Start: Joi.date().iso().allow(null, ''),
+            phase2End: Joi.date().iso().allow(null, ''),
+            phase3Start: Joi.date().iso().allow(null, ''),
+            phase3End: Joi.date().iso().allow(null, ''),
+            currentPhase: Joi.string().valid('phase1', 'phase2', 'phase3', 'closed')
+        }),
+        updatePhase: Joi.object({
+            currentPhase: Joi.string().valid('phase1', 'phase2', 'phase3', 'closed').required()
         })
     }
 };

@@ -29,8 +29,9 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
     var [allGoals, setAllGoals] = useState([]);
     var [subGoalForm, setSubGoalForm] = useState({ title: '', weight: 10, deadline: '' });
 
-    var isOwner = detail.owner && (String(detail.owner._id || detail.owner) === String(user._id || user.id));
-    var isManager = user.role === 'TEAM_LEADER' || user.role === 'ADMIN';
+    var isAdmin = user.role === 'ADMIN';
+    var isOwner = (detail.owner && (String(detail.owner._id || detail.owner) === String(user._id || user.id))) || isAdmin;
+    var isManager = user.role === 'TEAM_LEADER' || isAdmin;
     var isActive = ['approved', 'validated'].includes(detail.status);
     var isPendingApproval = ['pending', 'submitted', 'pending_approval'].includes(detail.status);
     
@@ -214,7 +215,7 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
                             <button onClick={function () { setShowChangeRequestModal(true); }} style={{ background: 'linear-gradient(135deg,#6366f1,#818cf8)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>📝 Change Request</button>
                         )}
                         {/* Manager: Evaluate completed */}
-                        {isManager && isActive && isCompleted && !detail.evaluationRating && !isOwner && (
+                        {isManager && isActive && isCompleted && !detail.evaluationRating && (!isOwner || isAdmin) && (
                             <button onClick={function () { setShowEvaluateModal(true); }} style={{ background: 'linear-gradient(135deg,#7c3aed,#a78bfa)', color: '#fff', border: 'none', borderRadius: '8px', padding: '8px 16px', cursor: 'pointer', fontWeight: 600, fontSize: '0.85rem' }}>📊 Evaluate</button>
                         )}
                         {/* Sub-goal + Check-in */}

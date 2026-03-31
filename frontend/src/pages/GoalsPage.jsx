@@ -42,9 +42,17 @@ function GoalsPage() {
     useEffect(function () { fetchCycles(); }, []);
     useEffect(function () { fetchObjectives(); }, [selectedCycle, activeTab]);
 
+    // Ultra-fast 1s heartbeat to keep data in sync without Sockets
+    useEffect(function () {
+        var intervalId = setInterval(function () {
+            fetchObjectives();
+        }, 1000); // 1-second pulse
+        return function () { clearInterval(intervalId); };
+    }, [selectedCycle, activeTab]);
+
     async function fetchCycles() {
         try {
-            var res = await api.get('/api/cycles');
+            var res = await api.get('/api/cycles', { params: { t: Date.now() } });
             setCycles(res.data);
             var active = res.data.filter(function (c) { return c.status === 'active'; });
             if (active.length > 0) setSelectedCycle(active[0]._id);
@@ -52,8 +60,10 @@ function GoalsPage() {
     }
 
     async function fetchObjectives() {
-        setLoading(true);
+        // Only loading on fresh select to prevent poll-flickers
+        if (objectives.length === 0) setLoading(true); 
         try {
+            var t = Date.now();
             var result = [];
             var indArr = [];
             var tmArr = [];
@@ -121,11 +131,16 @@ function GoalsPage() {
             await api.delete('/api/objectives/' + deletingObjective);
             toast.success('Goal deleted successfully!');
             if (selectedGoal && selectedGoal._id === deletingObjective) setSelectedGoal(null);
-            setDeletingObjective(null); setShowDeleteDialog(false); fetchObjectives();
+            setDeletingObjective(null); setShowDeleteDialog(false);
+            setTimeout(fetchObjectives, 500);
         } catch (err) { toast.error(err.response?.data?.message || 'Failed to delete'); setShowDeleteDialog(false); }
     }
     async function handleDuplicate(id) {
-        try { await api.post('/api/objectives/' + id + '/duplicate'); toast.success('Goal duplicated!'); fetchObjectives(); }
+        try { 
+            await api.post('/api/objectives/' + id + '/duplicate'); 
+            toast.success('Goal duplicated!'); 
+            setTimeout(fetchObjectives, 500);
+        }
         catch (err) { toast.error(err.response?.data?.message || 'Failed to duplicate'); }
     }
     function openEditModal(obj) { setEditingObjective(obj); setShowEditModal(true); }

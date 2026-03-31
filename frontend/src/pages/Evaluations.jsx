@@ -3,6 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../components/AuthContext';
 import CreateGoalModal from '../components/goals/CreateGoalModal';
 import EditGoalModal from '../components/goals/EditGoalModal';
+import api from '../services/api';
 
 function Evaluations() {
   const { user } = useAuth();
@@ -48,12 +49,11 @@ function Evaluations() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  var API = 'http://localhost:5000';
 
   async function fetchData() {
     try {
-      var cyclesRes = await axios.get(API + '/api/cycles');
-      var objectivesRes = await axios.get(API + '/api/objectives/my');
+      var cyclesRes = await api.get('/api/cycles');
+      var objectivesRes = await api.get('/api/objectives/my');
       setCycles(cyclesRes.data);
       setObjectives(objectivesRes.data);
     } catch (err) {
@@ -284,18 +284,21 @@ function Evaluations() {
     setError('');
     setDateError('');
 
-    var dateValidation = validateCycleDates();
-    if (dateValidation) {
-      setDateError(dateValidation);
-      return;
+    // Admin bypasses all client-side date validation
+    if (user.role !== 'ADMIN') {
+      var dateValidation = validateCycleDates();
+      if (dateValidation) {
+        setDateError(dateValidation);
+        return;
+      }
     }
 
     try {
       if (selectedCycle) {
-        await axios.put(API + '/api/cycles/' + selectedCycle._id, cycleForm);
+        await api.put('/api/cycles/' + selectedCycle._id, cycleForm);
         setSuccess('Cycle updated successfully!');
       } else {
-        await axios.post(API + '/api/cycles', cycleForm);
+        await api.post('/api/cycles', cycleForm);
         setSuccess('Cycle created successfully!');
       }
       setShowCycleModal(false);
@@ -307,7 +310,7 @@ function Evaluations() {
 
   async function handleDeleteCycle(cycleId) {
     try {
-      await axios.delete(API + '/api/cycles/' + cycleId);
+      await api.delete('/api/cycles/' + cycleId);
       setSuccess('Cycle deleted!');
       setShowEventModal(false);
       setShowCycleModal(false);
@@ -349,10 +352,10 @@ function Evaluations() {
       };
 
       if (selectedObjective) {
-        await axios.put(API + '/api/objectives/' + selectedObjective._id, data);
+        await api.put('/api/objectives/' + selectedObjective._id, data);
         setSuccess('Objective updated!');
       } else {
-        await axios.post(API + '/api/objectives', data);
+        await api.post('/api/objectives', data);
         setSuccess('Objective created!');
       }
       setShowObjectiveModal(false);
@@ -364,7 +367,7 @@ function Evaluations() {
 
   async function handleDeleteObjective(objId) {
     try {
-      await axios.delete(API + '/api/objectives/' + objId);
+      await api.delete('/api/objectives/' + objId);
       setSuccess('Objective deleted!');
       setShowObjectiveModal(false);
       setShowEventModal(false);
@@ -389,7 +392,7 @@ function Evaluations() {
     setError('');
 
     try {
-      await axios.post(API + '/api/objectives/' + selectedObjective._id + '/submit', {
+      await api.post('/api/objectives/' + selectedObjective._id + '/submit', {
         achievementPercent: parseInt(submitForm.achievementPercent),
         selfAssessment: submitForm.selfAssessment
       });

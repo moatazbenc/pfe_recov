@@ -320,7 +320,7 @@ exports.prioritizeNotifications = async (req, res) => {
 // ============ UNIFIED AI ASSIST ENDPOINT ============
 exports.assist = async (req, res) => {
     try {
-        const { action, context } = req.body;
+        const { action, context, prompt } = req.body;
 
         var actions = {
             'summarize-feedback': function () {
@@ -361,11 +361,38 @@ exports.assist = async (req, res) => {
             }
         };
 
-        if (actions[action]) {
+        if (action && actions[action]) {
             return res.json({ result: actions[action]() });
         }
 
-        return res.json({ result: 'Use specific actions: summarize-feedback, write-update, review-prep, generate-goal, suggest-kpis, summarize-performance' });
+        // --- Free-text primitive chatbot logic ---
+        if (prompt) {
+            const lowerPrompt = prompt.toLowerCase();
+            
+            if (lowerPrompt.includes('goal') || lowerPrompt.includes('smart')) {
+                return res.json({ result: "Here is a SMART goal suggestion: 'Increase unit test coverage from 65% to 85% by Q3 to reduce production bugs by 15%, measured via SonarQube.' Make sure your goals are Specific, Measurable, Achievable, Relevant, and Time-bound!" });
+            }
+            if (lowerPrompt.includes('kpi') || lowerPrompt.includes('metric')) {
+                return res.json({ result: "When designing KPIs, look for leading indicators. Instead of just 'Revenue' (lagging), try tracking 'Qualified Meetings Booked' (leading). Can I suggest specific metrics for your department?" });
+            }
+            if (lowerPrompt.includes('update') || lowerPrompt.includes('progress')) {
+                return res.json({ result: "To write a great progress update, use the 'What, So What, Now What' framework. 1. What did you do? 2. Why does it matter? 3. What are you doing next week?" });
+            }
+            if (lowerPrompt.includes('hello') || lowerPrompt.includes('hi')) {
+                return res.json({ result: "Hello! I am your AI Performance Assistant. I can help you draft SMART goals, brainstorm KPIs, or formulate progress updates. What would you like to work on?" });
+            }
+            
+            const generalResponses = [
+                "That's an interesting perspective. Consider breaking that down into smaller, measurable milestones so you can track it in your next Annual Cycle phase.",
+                "I recommend aligning that with your Phase 1 goals. Have you checked if it fits within your 100% capacity limit?",
+                "This sounds like a great topic for your next 1-on-1 meeting. I can help you structure an agenda if you'd like.",
+                "Great question! I'm a lightweight local assistant right now. To help you best, ask me to 'Suggest a goal', 'Improve my KPIs', or 'Write an update'."
+            ];
+            
+            return res.json({ result: pickRandom(generalResponses) });
+        }
+
+        return res.json({ result: 'Use specific actions or provide a prompt.' });
     } catch (err) {
         res.status(500).json({ message: 'AI assist failed' });
     }

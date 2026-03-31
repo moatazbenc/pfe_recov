@@ -17,7 +17,7 @@ function MeetingsPage() {
     var [editingId, setEditingId] = useState(null);
     var [showDetail, setShowDetail] = useState(null);
     var [filter, setFilter] = useState('upcoming');
-    var [confirmDelete, setConfirmDelete] = useState(null);
+    var fetchIdRef = React.useRef(0);
 
     var [form, setForm] = useState({
         title: '', description: '', date: '', startTime: '09:00', endTime: '10:00',
@@ -25,30 +25,36 @@ function MeetingsPage() {
     });
 
     async function fetchMeetings() {
+        var currentFetchId = ++fetchIdRef.current;
         try {
-            var params = {};
-            if (filter === 'upcoming') params.upcoming = 'true';
+            // Append unique timestamp to bypass any browser/proxy cache
+            var params = { t: Date.now() };
+            if (filter === 'upcoming') { params.upcoming = 'true'; params.status = 'scheduled,in_progress'; }
             if (filter === 'completed') params.status = 'completed';
             if (filter === 'cancelled') params.status = 'cancelled';
-            var res = await api.get('/api/meetings', { params });
-            setMeetings(res.data.meetings || []);
+            var res = await api.get('/api/meetings', { params: params });
+            if (currentFetchId === fetchIdRef.current) {
+                setMeetings(res.data.meetings || []);
+            }
         } catch (err) {
-            toast.error('Failed to load meetings');
+            console.error('Meetings fetch error:', err);
         } finally {
-            setLoading(false);
+            if (currentFetchId === fetchIdRef.current) {
+                setLoading(false);
+            }
         }
     }
 
     async function fetchUsers() {
         try {
-            var res = await api.get('/api/users');
+            var res = await api.get('/api/users', { params: { _: Date.now() } });
             setUsers(res.data.users || res.data || []);
         } catch (err) { console.error(err); }
     }
 
     async function fetchTeams() {
         try {
-            var res = await api.get('/api/teams');
+            var res = await api.get('/api/teams', { params: { _: Date.now() } });
             setTeams(Array.isArray(res.data) ? res.data : (res.data.teams || []));
         } catch (err) { /* Collaborators may not have access */ }
     }
@@ -56,8 +62,28 @@ function MeetingsPage() {
     useEffect(function () { fetchUsers(); fetchTeams(); }, []);
     useEffect(function () { setLoading(true); fetchMeetings(); }, [filter]);
 
+    // Ultra-fast 1s heartbeat to keep data in sync without Sockets
+    useEffect(function () {
+        var intervalId = setInterval(function () {
+            fetchMeetings();
+        }, 1000); // 1 second pulse
+        return function () { clearInterval(intervalId); };
+    }, [filter]);
+
     function openCreateModal() {
-        setForm({ title: '', description: '', date: '', startTime: '09:00', endTime: '10:00', type: 'team', attendees: [], team: '', recurring: 'none', location: '' });
+        var now = new Date();
+        var nextHour = new Date(now);
+        nextHour.setHours(now.getHours() + 1, 0, 0, 0);
+        var endHour = new Date(nextHour);
+        endHour.setHours(nextHour.getHours() + 1, 0, 0, 0);
+        var formatTime = function(d) { return d.getHours().toString().padStart(2, '0') + ':' + d.getMinutes().toString().padStart(2, '0'); };
+        var todayStr = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
+        setForm({ 
+            title: '', description: '', date: todayStr, 
+            startTime: formatTime(nextHour), endTime: formatTime(endHour), 
+            type: 'team', attendees: [], team: '', recurring: 'none', location: '' 
+        });
         setIsEditing(false);
         setEditingId(null);
         setShowModal(true);
@@ -84,18 +110,45 @@ function MeetingsPage() {
     async function handleCreate(e) {
         e.preventDefault();
         try {
+            var res;
             if (isEditing) {
-                await api.put('/api/meetings/' + editingId, form);
+                res = await api.put('/api/meetings/' + editingId, form);
                 toast.success('Meeting updated!');
             } else {
-                await api.post('/api/meetings', form);
+                res = await api.post('/api/meetings', form);
                 toast.success('Meeting created!');
             }
             setShowModal(false);
+            
+            // Increment fetchIdRef to invalidate any pending heartbeats
+            fetchIdRef.current += 1;
+            
+            // Instantly update local UI
+            if (res && res.data && res.data.meeting) {
+                var newMeeting = res.data.meeting;
+                setMeetings(function(prev) {
+                    if (isEditing) {
+                        return prev.map(function(m) { return m._id === editingId ? newMeeting : m; });
+                    } else {
+                        // Include seamlessly in the view
+                        if (filter === 'upcoming' && (newMeeting.status === 'scheduled' || newMeeting.status === 'in_progress')) {
+                            return [newMeeting].concat(prev);
+                        } else if (filter === 'all' || filter === newMeeting.status) {
+                            return [newMeeting].concat(prev);
+                        }
+                        return prev;
+                    }
+                });
+            }
+            
             fetchMeetings();
             if (showDetail && showDetail._id === editingId) {
-                var res = await api.get('/api/meetings/' + editingId);
-                setShowDetail(res.data.meeting);
+                if (res && res.data && res.data.meeting) {
+                    setShowDetail(res.data.meeting);
+                } else {
+                    res = await api.get('/api/meetings/' + editingId);
+                    setShowDetail(res.data.meeting);
+                }
             }
         } catch (err) {
             toast.error(err.response?.data?.message || (isEditing ? 'Failed to update meeting' : 'Failed to create meeting'));
@@ -111,7 +164,6 @@ function MeetingsPage() {
         } catch (err) {
             toast.error('Failed to delete meeting');
         }
-        setConfirmDelete(null);
     }
 
     async function handleDuplicate(id) {
@@ -221,7 +273,7 @@ function MeetingsPage() {
                                     {meeting.status === 'in_progress' && <button className="btn btn--primary btn--sm" onClick={function () { handleStatusChange(meeting._id, 'completed'); }}>✓ Complete</button>}
                                     <button className="btn btn--ghost btn--sm" onClick={function () { openEditModal(meeting); }}>✏️ Edit</button>
                                     <button className="btn btn--ghost btn--sm" onClick={function () { handleDuplicate(meeting._id); }}>📋 Duplicate</button>
-                                    <button className="btn btn--ghost btn--sm" style={{ color: '#ef4444' }} onClick={function (e) { e.stopPropagation(); setConfirmDelete(meeting._id); }}>🗑️</button>
+                                    <button className="btn btn--ghost btn--sm" style={{ color: '#ef4444' }} onClick={function (e) { e.stopPropagation(); handleDelete(meeting._id); }}>🗑️</button>
                                 </div>
                             </div>
                         );
@@ -330,16 +382,6 @@ function MeetingsPage() {
                     toast={toast}
                 />
             )}
-
-            <ConfirmDialog
-                open={!!confirmDelete}
-                title="Delete Meeting?"
-                message="This will permanently delete the meeting and cannot be undone."
-                confirmLabel="Delete"
-                danger={true}
-                onConfirm={function () { handleDelete(confirmDelete); }}
-                onCancel={function () { setConfirmDelete(null); }}
-            />
         </div>
     );
 }

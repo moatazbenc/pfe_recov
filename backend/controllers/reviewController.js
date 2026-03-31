@@ -189,7 +189,7 @@ exports.submitReview = async (req, res) => {
   try {
     const review = await Review.findById(req.params.id);
     if (!review) return res.status(404).json({ success: false, message: 'Review not found' });
-    if (review.reviewer.toString() !== req.user._id.toString()) {
+    if (review.reviewer.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 
@@ -221,7 +221,7 @@ exports.saveDraft = async (req, res) => {
   try {
     const review = await Review.findById(req.params.id);
     if (!review) return res.status(404).json({ success: false, message: 'Review not found' });
-    if (review.reviewer.toString() !== req.user._id.toString()) {
+    if (review.reviewer.toString() !== req.user._id.toString() && req.user.role !== 'ADMIN') {
       return res.status(403).json({ success: false, message: 'Not authorized' });
     }
 

@@ -19,6 +19,14 @@ app.use(cors({
 app.use(express.json());
 app.use(xss());
 app.use(mongoSanitize());
+// Perfect Sync Aggressive No-Cache Middleware
+app.use((req, res, next) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.set('Pragma', 'no-cache');
+  res.set('Expires', '0');
+  res.set('Surrogate-Control', 'no-store');
+  next();
+});
 app.use(rateLimit({ windowMs: 15 * 60 * 1000, max: 5000 }));
 
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
@@ -31,6 +39,7 @@ app.get('/', (req, res) => {
 const routes = {
   '/api/auth': './routes/auth',
   '/api/users': './routes/users',
+  '/api/team-members': './routes/teamMembers',
   '/api/teams': './routes/teams',
   '/api/cycles': './routes/cycles',
   '/api/objectives': './routes/objectives',
@@ -46,7 +55,12 @@ const routes = {
   '/api/tasks': './routes/tasks',
   '/api/surveys': './routes/surveys',
   '/api/reviews': './routes/reviews',
-  '/api/career': './routes/career'
+  '/api/career': './routes/career',
+  '/api/goals': './routes/goals',
+  '/api/goal-reviews': './routes/goalReviews',
+  '/api/performance': './routes/performance',
+  '/api/dashboard': './routes/dashboard',
+  '/api/reports': './routes/reports'
 };
 
 Object.entries(routes).forEach(([routePath, modulePath]) => {
@@ -99,6 +113,13 @@ mongoose.connect(mongoUri, {
       startReminderCron(); 
     } catch (err) {
       console.error('Failed to start reminder cron:', err.message);
+    }
+    
+    try { 
+      const { startGoalDeadlineCron } = require('./cron/goalDeadlineCron'); 
+      startGoalDeadlineCron(); 
+    } catch (err) {
+      console.error('Failed to start goal deadline cron:', err.message);
     }
 
     app.listen(PORT, () => {
