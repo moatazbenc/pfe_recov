@@ -75,7 +75,7 @@ function isTeamMember(team, userId) {
 // ========== CREATE ==========
 exports.createObjective = async (req, res) => {
   try {
-    const { title, description, successIndicator, weight, deadline, cycle, category, labels, visibility, startDate, parentObjective, goalStatus, targetUser, targetTeam } = req.body;
+    const { title, description, successIndicator, weight, deadline, cycle, category, labels, visibility, startDate, parentObjective, targetUser, targetTeam } = req.body;
     if (!cycle) return res.status(400).json({ success: false, message: 'Cycle is required.' });
     const targetedCycle = await Cycle.findById(cycle);
     if (!targetedCycle) return res.status(404).json({ success: false, message: 'Cycle not found.' });
@@ -117,7 +117,7 @@ exports.createObjective = async (req, res) => {
 
       const memberObjectives = team.members.map(member => ({
         owner: member._id, cycle, category: 'team', title, description, successIndicator: successIndicator || title, weight, deadline, status: 'assigned', source: 'manager_assigned', assignedBy: req.user.id,
-        labels: labels || [], visibility: visibility || 'public', startDate: startDate || null, goalStatus: goalStatus || 'no_status', parentObjective: parentObjective || null,
+        labels: labels || [], visibility: visibility || 'public', startDate: startDate || null, parentObjective: parentObjective || null,
         activityLog: [{ user: req.user.id, action: 'assigned', details: 'Team goal assigned by manager' }],
       }));
       await Objective.insertMany(memberObjectives);
@@ -130,7 +130,7 @@ exports.createObjective = async (req, res) => {
       const objective = await Objective.create({
         owner: ownerId, cycle, category: 'individual', title, description, successIndicator, weight, deadline,
         status: initialStatus, source, assignedBy, labels: labels || [], visibility: visibility || 'public',
-        startDate: startDate || null, parentObjective: parentObjective || null, goalStatus: goalStatus || 'no_status',
+        startDate: startDate || null, parentObjective: parentObjective || null,
         activityLog: [{ user: req.user.id, action: source === 'manager_assigned' ? 'assigned' : 'created', details: source === 'manager_assigned' ? 'Goal assigned by manager' : 'Goal created as draft' }],
       });
 
@@ -158,7 +158,6 @@ exports.getObjectives = async (req, res) => {
   try {
     let filter = {};
     if (req.query.cycle) filter.cycle = req.query.cycle;
-    if (req.query.goalStatus && req.query.goalStatus !== 'all') filter.goalStatus = req.query.goalStatus;
     if (req.query.label) filter.labels = req.query.label;
     if (req.query.status && req.query.status !== 'all') filter.status = req.query.status;
 
@@ -281,7 +280,6 @@ exports.getCompletedAwaitingEvaluation = async (req, res) => {
     const objectives = await Objective.find({
       owner: { $in: team.members },
       status: { $in: ['approved', 'validated'] },
-      goalStatus: { $in: ['achieved', 'closed'] },
       evaluationRating: '',
     }).populate('owner', 'name email').populate('cycle', 'name year status');
     res.json({ success: true, objectives });
@@ -302,7 +300,7 @@ exports.updateObjective = async (req, res) => {
       return res.status(400).json({ success: false, message: 'Only draft/revision-requested objectives can be updated.' });
     }
 
-    const { title, description, weight, deadline, labels, visibility, startDate, goalStatus, parentObjective } = req.body;
+    const { title, description, weight, deadline, labels, visibility, startDate, parentObjective } = req.body;
     if (title !== undefined) objective.title = title;
     if (description !== undefined) objective.description = description;
     if (weight !== undefined) objective.weight = weight;
@@ -310,7 +308,6 @@ exports.updateObjective = async (req, res) => {
     if (labels !== undefined) objective.labels = labels;
     if (visibility !== undefined) objective.visibility = visibility;
     if (startDate !== undefined) objective.startDate = startDate;
-    if (goalStatus !== undefined) objective.goalStatus = goalStatus;
     if (parentObjective !== undefined) objective.parentObjective = parentObjective;
 
     if (weight !== undefined) {
@@ -417,7 +414,6 @@ exports.validateObjective = async (req, res) => {
     } else {
       // approved / validated
       objective.status = status === 'validated' ? 'validated' : 'approved';
-      if (objective.goalStatus === 'no_status') objective.goalStatus = 'not_started';
     }
 
     if (managerAdjustedPercent !== undefined && managerAdjustedPercent !== null) {
@@ -451,7 +447,6 @@ exports.acknowledgeObjective = async (req, res) => {
 
     if (accepted) {
       objective.status = 'approved';
-      if (objective.goalStatus === 'no_status') objective.goalStatus = 'not_started';
       addActivity(objective, req.user.id, 'acknowledged', 'Goal accepted by employee', oldStatus, 'approved');
       await objective.save();
 
@@ -484,10 +479,8 @@ exports.markCompleted = async (req, res) => {
     if (String(objective.owner) !== String(req.user.id) && req.user.role !== 'ADMIN') return res.status(403).json({ success: false, message: 'Only the owner can mark completed.' });
     if (!['approved', 'validated'].includes(objective.status)) return res.status(400).json({ success: false, message: 'Only active goals can be marked completed.' });
 
-    const oldGoalStatus = objective.goalStatus;
-    objective.goalStatus = 'achieved';
     if (req.body.selfAssessment) objective.selfAssessment = req.body.selfAssessment;
-    addActivity(objective, req.user.id, 'completed', 'Goal marked as completed', oldGoalStatus, 'achieved');
+    addActivity(objective, req.user.id, 'completed', 'Goal marked as completed', oldStatus, 'achieved');
     await objective.save();
 
     const team = await getTeamForUser(objective.owner);
@@ -544,7 +537,6 @@ exports.createChangeRequest = async (req, res) => {
     if (!requestType || !reason) return res.status(400).json({ success: false, message: 'requestType and reason required.' });
 
     objective.changeRequests.push({ requestType, requestedBy: req.user.id, reason, newDeadline, newDescription, newTitle });
-    if (requestType === 'pause') { objective.goalStatus = 'on_hold'; }
     addActivity(objective, req.user.id, 'change_requested', `${requestType}: ${reason}`);
     await objective.save();
 
@@ -575,10 +567,7 @@ exports.resolveChangeRequest = async (req, res) => {
     if (status === 'approved') {
       if (cr.requestType === 'due_date_extension' && cr.newDeadline) objective.deadline = cr.newDeadline;
       if (cr.requestType === 'scope_change') { if (cr.newDescription) objective.description = cr.newDescription; if (cr.newTitle) objective.title = cr.newTitle; }
-      if (cr.requestType === 'cancellation') { objective.status = 'cancelled'; objective.goalStatus = 'closed'; }
-      if (cr.requestType === 'pause') { objective.goalStatus = 'on_hold'; }
-    } else if (cr.requestType === 'pause' && status === 'rejected') {
-      objective.goalStatus = objective.achievementPercent > 0 ? 'in_progress' : 'not_started';
+      if (cr.requestType === 'cancellation') { objective.status = 'cancelled'; }
     }
 
     addActivity(objective, req.user.id, 'change_resolved', `${cr.requestType} ${status}: ${resolutionNote || ''}`);
@@ -624,21 +613,6 @@ exports.submitProgress = async (req, res) => {
         await createNotification(team.leader, 'Objective Completed', `${user ? user.name : 'A team member'} reached 100% on "${objective.title}".`, '/goals', 'GOAL_COMPLETED');
       }
     }
-    res.json({ success: true, objective });
-  } catch (err) { res.status(500).json({ success: false, message: err.message }); }
-};
-
-// ========== GOAL STATUS ==========
-exports.updateGoalStatus = async (req, res) => {
-  try {
-    const objective = await Objective.findById(req.params.id);
-    if (!objective) return res.status(404).json({ success: false, message: 'Objective not found.' });
-    const { goalStatus } = req.body;
-    if (!goalStatus) return res.status(400).json({ success: false, message: 'goalStatus is required.' });
-    const old = objective.goalStatus;
-    objective.goalStatus = goalStatus;
-    addActivity(objective, req.user.id, 'status_changed', `Execution status changed from ${old} to ${goalStatus}`, old, goalStatus);
-    await objective.save();
     res.json({ success: true, objective });
   } catch (err) { res.status(500).json({ success: false, message: err.message }); }
 };
@@ -701,9 +675,8 @@ exports.addProgressUpdate = async (req, res) => {
   try {
     const objective = await Objective.findById(req.params.id);
     if (!objective) return res.status(404).json({ success: false, message: 'Objective not found.' });
-    const { message, goalStatus, kpiUpdates } = req.body;
+    const { message, kpiUpdates } = req.body;
     if (!message) return res.status(400).json({ success: false, message: 'Message is required.' });
-    if (goalStatus) objective.goalStatus = goalStatus;
     if (kpiUpdates && Array.isArray(kpiUpdates)) {
       kpiUpdates.forEach(update => { const kpi = objective.kpis.id(update._id); if (kpi && update.currentValue !== undefined) { kpi.currentValue = update.currentValue; if (update.status) kpi.status = update.status; } });
       objective.achievementPercent = calculateKpiProgress(objective.kpis);
@@ -784,7 +757,7 @@ exports.duplicateObjective = async (req, res) => {
       title: source.title + ' (Copy)', description: source.description, successIndicator: source.successIndicator,
       owner: req.user.id, cycle: source.cycle, category: source.category, weight: source.weight, deadline: source.deadline,
       status: 'draft', source: 'employee_created', labels: source.labels, visibility: source.visibility,
-      startDate: source.startDate, goalStatus: 'no_status',
+      startDate: source.startDate,
       kpis: source.kpis.map(k => ({ title: k.title, metricType: k.metricType, initialValue: k.initialValue, targetValue: k.targetValue, currentValue: k.initialValue, unit: k.unit })),
       activityLog: [{ user: req.user.id, action: 'created', details: 'Duplicated from: ' + source.title }],
     });

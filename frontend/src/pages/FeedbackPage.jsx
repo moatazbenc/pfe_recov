@@ -34,7 +34,7 @@ function FeedbackPage() {
     var url = tab === 'received' ? '/api/feedback/received' : tab === 'sent' ? '/api/feedback/sent' : '/api/feedback/all';
     Promise.all([
       api.get(url),
-      api.get('/api/users'),
+      api.get('/api/users/filter/list'),
     ]).then(function (res) {
       setFeedbacks(res[0].data.feedbacks || []);
       setUsers(Array.isArray(res[1].data) ? res[1].data : (res[1].data.users || []));

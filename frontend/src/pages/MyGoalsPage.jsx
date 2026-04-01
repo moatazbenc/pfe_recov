@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/common/Toast';
@@ -27,27 +27,28 @@ function MyGoalsPage() {
     weight: 10, metric: '', targetValue: '', startDate: '', dueDate: ''
   });
 
+  const hasFetchedRef = useRef(false);
+
   useEffect(() => { fetchCycles(); }, []);
   useEffect(() => { 
-    if (selectedCycleId) fetchGoalsAndStatus(); 
-  }, [selectedCycleId]);
-
-  // Ultra-fast 1s heartbeat to keep data in sync without Sockets
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (selectedCycleId) fetchGoalsAndStatus();
-    }, 1000); // 1-second pulse
-    return () => clearInterval(interval);
+    if (selectedCycleId) {
+      hasFetchedRef.current = false;
+      fetchGoalsAndStatus(); 
+    }
   }, [selectedCycleId]);
 
   async function fetchCycles() {
     try {
-      const res = await api.get('/api/cycles', { params: { t: Date.now() } });
-      const data = res.data.filter(c => c.status !== 'draft'); 
+      const res = await api.get('/api/cycles');
+      const data = Array.isArray(res.data) ? res.data : (res.data.cycles || []);
       setCycles(data);
       if (data.length > 0) {
-        setSelectedCycleId(data[0]._id);
-        setActiveCycle(data[0]);
+        // Prefer active/in_progress cycles, then any non-closed, then first available
+        const activeCycle = data.find(c => ['active', 'in_progress', 'open'].includes(c.status))
+          || data.find(c => c.status !== 'closed')
+          || data[0];
+        setSelectedCycleId(activeCycle._id);
+        setActiveCycle(activeCycle);
       } else {
         setLoading(false);
       }
@@ -59,18 +60,19 @@ function MyGoalsPage() {
   }
 
   async function fetchGoalsAndStatus() {
-    // Only loading on fresh cycle select to prevent poll-flickers
-    if (goals.length === 0) setLoading(true); 
+    // Only show loading spinner on initial fetch
+    if (!hasFetchedRef.current) setLoading(true);
     try {
-      const gRes = await api.get(`/api/goals?cycleId=${selectedCycleId}&t=${Date.now()}`);
+      const gRes = await api.get(`/api/goals?cycleId=${selectedCycleId}`);
       setGoals(gRes.data.goals || []);
       
-      const vRes = await api.get(`/api/goals/validation-status/${user.id}/${selectedCycleId}?t=${Date.now()}`);
+      const vRes = await api.get(`/api/goals/validation-status/${user.id}/${selectedCycleId}`);
       setValidationData(vRes.data);
       
       // Update active cycle ref
       const cycle = cycles.find(c => c._id === selectedCycleId);
       if (cycle) setActiveCycle(cycle);
+      hasFetchedRef.current = true;
     } catch (err) {
       console.error(err);
       toast.error('Failed to load goal data');

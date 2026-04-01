@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
 import { useToast } from '../components/common/Toast';
@@ -23,8 +23,6 @@ function GoalsPage() {
     var [selectedCycle, setSelectedCycle] = useState('');
     var [activeTab, setActiveTab] = useState('my');
     var [activeView, setActiveView] = useState('list');
-    var [statusFilter, setStatusFilter] = useState(null);
-    var [workflowFilter, setWorkflowFilter] = useState(null);
     var [searchTerm, setSearchTerm] = useState('');
     var [selectedGoal, setSelectedGoal] = useState(null);
     var [showCreateModal, setShowCreateModal] = useState(false);
@@ -39,20 +37,17 @@ function GoalsPage() {
 
     var toast = useToast();
 
-    useEffect(function () { fetchCycles(); }, []);
-    useEffect(function () { fetchObjectives(); }, [selectedCycle, activeTab]);
+    var hasFetchedRef = React.useRef(false);
 
-    // Ultra-fast 1s heartbeat to keep data in sync without Sockets
+    useEffect(function () { fetchCycles(); }, []);
     useEffect(function () {
-        var intervalId = setInterval(function () {
-            fetchObjectives();
-        }, 1000); // 1-second pulse
-        return function () { clearInterval(intervalId); };
+        hasFetchedRef.current = false;
+        fetchObjectives();
     }, [selectedCycle, activeTab]);
 
     async function fetchCycles() {
         try {
-            var res = await api.get('/api/cycles', { params: { t: Date.now() } });
+            var res = await api.get('/api/cycles');
             setCycles(res.data);
             var active = res.data.filter(function (c) { return c.status === 'active'; });
             if (active.length > 0) setSelectedCycle(active[0]._id);
@@ -60,10 +55,9 @@ function GoalsPage() {
     }
 
     async function fetchObjectives() {
-        // Only loading on fresh select to prevent poll-flickers
-        if (objectives.length === 0) setLoading(true); 
+        // Only show loading spinner on initial fetch
+        if (!hasFetchedRef.current) setLoading(true);
         try {
-            var t = Date.now();
             var result = [];
             var indArr = [];
             var tmArr = [];
@@ -118,6 +112,7 @@ function GoalsPage() {
                 result = activeTab === 'team' ? tmArr : allData2;
             }
             setObjectives(result);
+            hasFetchedRef.current = true;
         } catch (err) {
             console.error(err);
             setObjectives([]); setIndividualObjectives([]); setTeamObjectives([]); setValidation(null);
@@ -150,8 +145,6 @@ function GoalsPage() {
 
     // Apply filters
     var filteredObjectives = objectives;
-    if (statusFilter) filteredObjectives = filteredObjectives.filter(function (o) { return (o.goalStatus || 'no_status') === statusFilter; });
-    if (workflowFilter) filteredObjectives = filteredObjectives.filter(function (o) { return o.status === workflowFilter; });
     if (searchTerm) {
         var lower = searchTerm.toLowerCase();
         filteredObjectives = filteredObjectives.filter(function(o) {
@@ -205,12 +198,11 @@ function GoalsPage() {
             </div>
 
             <GoalFilters
-                activeTab={activeTab} onTabChange={function(tab) { setActiveTab(tab); setStatusFilter(null); setWorkflowFilter(null); }}
+                activeTab={activeTab} onTabChange={function(tab) { setActiveTab(tab); }}
                 cycles={cycles} selectedCycle={selectedCycle} onCycleChange={setSelectedCycle}
                 searchTerm={searchTerm} onSearchChange={setSearchTerm}
-                workflowFilter={workflowFilter} onWorkflowFilter={setWorkflowFilter}
             />
-            <GoalProgressSummary objectives={objectives} statusFilter={statusFilter} onStatusFilter={setStatusFilter} />
+            <GoalProgressSummary objectives={objectives} />
 
             {activeTab === 'my' && selectedCycle && isDraftCycle && (
                 <div className="submission-panel" style={{ backgroundColor: '#fff', padding: '15px', borderRadius: '8px', marginBottom: '20px', boxShadow: '0 2px 4px rgba(0,0,0,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>

@@ -24,29 +24,28 @@ function TasksPage() {
   var [form, setForm] = useState({ title: '', description: '', assigneeId: '', priority: 'medium', dueDate: '', labels: '', linkedGoal: '', notes: '' });
   var [sending, setSending] = useState(false);
 
-  useEffect(function () { loadData(); }, [tab]);
+  var hasFetchedRef = React.useRef(false);
 
-  // Ultra-fast 1s polling for "real-time" feel without Sockets
   useEffect(function () {
-    var interval = setInterval(loadData, 1000);
-    return function () { clearInterval(interval); };
+    hasFetchedRef.current = false;
+    loadData();
   }, [tab]);
 
   function loadData() {
-    // Only show loading for original load to prevent flickering
-    if (tasks.length === 0) setLoading(true); 
+    // Only show loading for initial load to prevent flickering
+    if (!hasFetchedRef.current) setLoading(true);
     var url = tab === 'my' ? '/api/tasks/my' : tab === 'assigned' ? '/api/tasks/assigned' : '/api/tasks/all';
-    var params = { t: Date.now() };
     Promise.all([
-      api.get(url, { params: params }),
-      api.get('/api/tasks/stats', { params: params }),
-      api.get('/api/users', { params: params }),
-      api.get('/api/objectives/my', { params: params }),
+      api.get(url),
+      api.get('/api/tasks/stats'),
+      api.get('/api/users'),
+      api.get('/api/objectives/my'),
     ]).then(function (res) {
       setTasks(res[0].data.tasks || []);
       setStats(res[1].data.stats || null);
       setUsers(Array.isArray(res[2].data) ? res[2].data : (res[2].data.users || []));
       setObjectives(Array.isArray(res[3].data) ? res[3].data : (res[3].data.objectives || []));
+      hasFetchedRef.current = true;
     }).catch(function (err) {
       toast.error('Failed to load tasks');
     }).finally(function () { setLoading(false); });

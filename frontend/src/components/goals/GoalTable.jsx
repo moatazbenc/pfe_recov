@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import GoalProgressBar from './GoalProgressBar';
 import GoalStatusBadge from './GoalStatusBadge';
 
-var STATUS_ORDER = { 'off_track': 0, 'at_risk': 1, 'no_status': 2, 'not_started': 2, 'in_progress': 3, 'on_track': 3, 'on_hold': 4, 'achieved': 5, 'closed': 6 };
 
 function GoalTable({ objectives, onGoalClick, onStatusChange, onDelete, onDuplicate, onEdit, onValidate, showOwner, currentUser }) {
     var [expandedRows, setExpandedRows] = useState({});
@@ -14,7 +13,7 @@ function GoalTable({ objectives, onGoalClick, onStatusChange, onDelete, onDuplic
     function formatDate(d) { if (!d) return '—'; return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }); }
     function getInitials(name) { if (!name) return '?'; return name.split(' ').map(function (w) { return w[0]; }).join('').toUpperCase().substring(0, 2); }
     function getWeightColor(w) { if (w >= 30) return '#e74c3c'; if (w >= 20) return '#f39c12'; return '#27ae60'; }
-    function isOverdue(obj) { if (!obj.deadline) return false; return new Date(obj.deadline) < new Date() && obj.goalStatus !== 'closed' && obj.goalStatus !== 'achieved'; }
+    function isOverdue(obj) { if (!obj.deadline) return false; return new Date(obj.deadline) < new Date() && obj.achievementPercent < 100; }
 
     // Build tree
     var map = {};
@@ -29,8 +28,7 @@ function GoalTable({ objectives, onGoalClick, onStatusChange, onDelete, onDuplic
     if (sortConfig.key && sortConfig.direction) {
         roots = [...roots].sort(function (a, b) {
             var valA, valB;
-            if (sortConfig.key === 'status') { valA = STATUS_ORDER[a.goalStatus || 'no_status'] ?? 2; valB = STATUS_ORDER[b.goalStatus || 'no_status'] ?? 2; }
-            else if (sortConfig.key === 'progress') { valA = a.achievementPercent || 0; valB = b.achievementPercent || 0; }
+            if (sortConfig.key === 'progress') { valA = a.achievementPercent || 0; valB = b.achievementPercent || 0; }
             else if (sortConfig.key === 'deadline') { valA = a.deadline ? new Date(a.deadline).getTime() : Infinity; valB = b.deadline ? new Date(b.deadline).getTime() : Infinity; }
             else { return 0; }
             if (valA < valB) return sortConfig.direction === 'asc' ? -1 : 1;
@@ -71,7 +69,7 @@ function GoalTable({ objectives, onGoalClick, onStatusChange, onDelete, onDuplic
                                 <div style={{ display: 'flex', gap: '4px', marginTop: '2px', flexWrap: 'wrap' }}>
                                     {obj.category === 'team' && <span className="goals-table__team-tag">TEAM</span>}
                                     {isAssigned && <span className="goals-table__team-tag" style={{ background: '#6366f1', color: '#fff' }}>ASSIGNED</span>}
-                                    <GoalStatusBadge status={obj.status} type="workflow" />
+
                                 </div>
                             </div>
                         </div>
@@ -84,9 +82,7 @@ function GoalTable({ objectives, onGoalClick, onStatusChange, onDelete, onDuplic
                             <GoalProgressBar percent={obj.achievementPercent || 0} size="small" />
                         </div>
 
-                        <div className="goals-table__col goals-table__col--status">
-                            <GoalStatusBadge status={obj.goalStatus || 'no_status'} />
-                        </div>
+
 
                         <div className="goals-table__col goals-table__col--date">
                             <span className={isOverdue(obj) ? 'goals-table__date--overdue' : ''}>
@@ -104,7 +100,7 @@ function GoalTable({ objectives, onGoalClick, onStatusChange, onDelete, onDuplic
                                         <button onClick={function () { onGoalClick(obj); }}>View Details</button>
                                         {onEdit && ['draft', 'revision_requested', 'rejected'].includes(obj.status) && <button onClick={function () { onEdit(obj); }}>Edit Goal</button>}
                                         <button onClick={function () { onDuplicate(obj._id); }}>Duplicate</button>
-                                        {['draft', 'rejected'].includes(obj.status) && <button className="goals-table__dropdown--danger" onClick={function () { onDelete(obj._id); }}>Delete</button>}
+                                        {onDelete && <button className="goals-table__dropdown--danger" onClick={function () { onDelete(obj._id); }}>Delete Goal</button>}
                                     </div>
                                 </div>
                             </div>
@@ -152,9 +148,7 @@ function GoalTable({ objectives, onGoalClick, onStatusChange, onDelete, onDuplic
                 <div className="goals-table__col goals-table__col--progress" onClick={function() { handleSort('progress'); }} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }} title="Sort by Progress">
                     Progress {getSortIcon('progress')}
                 </div>
-                <div className="goals-table__col goals-table__col--status" onClick={function() { handleSort('status'); }} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }} title="Sort by Status">
-                    Status {getSortIcon('status')}
-                </div>
+
                 <div className="goals-table__col goals-table__col--date" onClick={function() { handleSort('deadline'); }} style={{ cursor: 'pointer', userSelect: 'none', display: 'flex', alignItems: 'center' }} title="Sort by End Date">
                     End Date {getSortIcon('deadline')}
                 </div>

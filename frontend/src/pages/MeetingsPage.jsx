@@ -47,28 +47,20 @@ function MeetingsPage() {
 
     async function fetchUsers() {
         try {
-            var res = await api.get('/api/users', { params: { _: Date.now() } });
+            var res = await api.get('/api/users');
             setUsers(res.data.users || res.data || []);
         } catch (err) { console.error(err); }
     }
 
     async function fetchTeams() {
         try {
-            var res = await api.get('/api/teams', { params: { _: Date.now() } });
+            var res = await api.get('/api/teams');
             setTeams(Array.isArray(res.data) ? res.data : (res.data.teams || []));
         } catch (err) { /* Collaborators may not have access */ }
     }
 
     useEffect(function () { fetchUsers(); fetchTeams(); }, []);
     useEffect(function () { setLoading(true); fetchMeetings(); }, [filter]);
-
-    // Ultra-fast 1s heartbeat to keep data in sync without Sockets
-    useEffect(function () {
-        var intervalId = setInterval(function () {
-            fetchMeetings();
-        }, 1000); // 1 second pulse
-        return function () { clearInterval(intervalId); };
-    }, [filter]);
 
     function openCreateModal() {
         var now = new Date();

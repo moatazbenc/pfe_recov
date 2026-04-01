@@ -16,7 +16,6 @@ function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoal
         labels: '',
         visibility: 'public',
         parentObjective: '',
-        goalStatus: 'no_status',
         targetUser: '',
         targetTeam: ''
     });
@@ -112,7 +111,6 @@ function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoal
                 labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }).filter(Boolean) : [],
                 visibility: form.visibility,
                 parentObjective: form.parentObjective || null,
-                goalStatus: form.goalStatus,
                 targetUser: form.targetUser || null,
                 targetTeam: form.targetTeam || null
             };
@@ -196,15 +194,6 @@ function CreateGoalModal({ onClose, onCreated, cycles, selectedCycle, parentGoal
                                 </select>
                             </div>
 
-                            <div className="goal-modal__field">
-                                <label>Initial Status</label>
-                                <select value={form.goalStatus} onChange={function (e) { handleChange('goalStatus', e.target.value); }}>
-                                    <option value="no_status">No Status</option>
-                                    <option value="on_track">On Track</option>
-                                    <option value="at_risk">At Risk</option>
-                                    <option value="off_track">Off Track</option>
-                                </select>
-                            </div>
 
                             {(user.role === 'TEAM_LEADER' || user.role === 'ADMIN' || user.role === 'HR') && (
                                 <div className="goal-modal__field">

@@ -1,14 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '../services/api';
 import { useAuth } from '../components/AuthContext';
 import DashboardHeader from '../components/dashboard/DashboardHeader';
 import GoalCard from '../components/dashboard/GoalCard';
 import MeetingCard from '../components/dashboard/MeetingCard';
 import TaskCard from '../components/dashboard/TaskCard';
-import RecognitionCard from '../components/dashboard/RecognitionCard';
-import ReviewCard from '../components/dashboard/ReviewCard';
 import FeedbackCard from '../components/dashboard/FeedbackCard';
-import SurveyCard from '../components/dashboard/SurveyCard';
 import ProgressDonut from '../components/dashboard/ProgressDonut';
 
 function Dashboard() {
@@ -20,6 +17,8 @@ function Dashboard() {
   const [performance, setPerformance] = useState(null);
   const [loading, setLoading] = useState(true);
   const [userTeams, setUserTeams] = useState([]); // Teams the user belongs to
+  const [goalsList, setGoalsList] = useState([]); // Goals from new /api/goals system
+  const hasFetchedRef = useRef(false);
 
   // Map tab keys to API scope values
   function getScopeFromTab(tab) {
@@ -29,10 +28,10 @@ function Dashboard() {
   }
 
   async function fetchData(tab) {
-    setLoading(true);
+    if (!hasFetchedRef.current) setLoading(true);
     try {
       const scope = getScopeFromTab(tab);
-      const params = { scope, t: Date.now() };
+      const params = { scope };
 
       const promises = [
         api.get('/api/stats/dashboard', { params }),
@@ -40,16 +39,19 @@ function Dashboard() {
       ];
 
       if (tab === 'me') {
-        promises.push(api.get('/api/objectives/my', { params: { t: Date.now() } }));
+        promises.push(api.get('/api/objectives/my'));
       } else if (tab === 'team') {
-        promises.push(api.get('/api/objectives', { params: { scope: 'team', t: Date.now() } }));
+        promises.push(api.get('/api/objectives', { params: { scope: 'team' } }));
       } else {
-        promises.push(api.get('/api/objectives', { params: { t: Date.now() } }));
+        promises.push(api.get('/api/objectives'));
       }
 
       if (user.role === 'ADMIN' || user.role === 'HR') {
-        promises.push(api.get('/api/stats/performance', { params: { t: Date.now() } }));
+        promises.push(api.get('/api/stats/performance'));
       }
+
+      // Also fetch goals from the new /api/goals system
+      promises.push(api.get('/api/goals'));
 
       const results = await Promise.all(promises);
       setStats(results[0].data);
@@ -59,11 +61,22 @@ function Dashboard() {
       const objArr = Array.isArray(resData) ? resData : (resData.objectives || resData.individualObjectives || []);
       setObjectives(objArr);
       
-      if (results[3]) setPerformance(results[3].data);
+      const performanceIdx = (user.role === 'ADMIN' || user.role === 'HR') ? 3 : null;
+      const goalsIdx = performanceIdx !== null ? 4 : 3;
+      
+      if (performanceIdx !== null && results[performanceIdx]) setPerformance(results[performanceIdx].data);
+      
+      // Extract goals from new system
+      if (results[goalsIdx]) {
+        const goalsData = results[goalsIdx].data;
+        setGoalsList(goalsData.goals || []);
+      }
+      
+      hasFetchedRef.current = true;
       
       if (tab === 'team') {
         try {
-          const teamsRes = await api.get('/api/teams', { params: { t: Date.now() } });
+          const teamsRes = await api.get('/api/teams');
           const allTeams = Array.isArray(teamsRes.data) ? teamsRes.data : (teamsRes.data.teams || []);
           const myTeams = allTeams.filter(t => {
             const isLeader = t.leader && (t.leader._id === user.id || t.leader === user.id);
@@ -81,6 +94,7 @@ function Dashboard() {
   }
 
   useEffect(function () {
+    hasFetchedRef.current = false;
     fetchData(activeTab);
   }, [activeTab]);
 
@@ -88,23 +102,13 @@ function Dashboard() {
     setActiveTab(newTab);
   }
 
-    function getHeatmapData() {
-    var objArr = Array.isArray(objectives) ? objectives : [];
-    var approvedArr = objArr.filter(function(o) { return ['approved', 'validated'].includes(o.status); });
-    var statusGroups = { on_track: 0, at_risk: 0, off_track: 0, achieved: 0, no_status: 0, closed: 0 };
-    approvedArr.forEach(function (o) {
-      var s = o.goalStatus || 'no_status';
-      if (statusGroups[s] !== undefined) statusGroups[s]++;
-      else statusGroups.no_status++;
-    });
-    return statusGroups;
-  }
+
 
   function getTimelineItems() {
     var items = [];
     var objArr = Array.isArray(objectives) ? objectives : [];
     objArr.forEach(function (o) {
-      items.push({ type: 'goal', title: o.title, date: o.updatedAt || o.createdAt, status: o.goalStatus, progress: o.achievementPercent || 0 });
+      items.push({ type: 'goal', title: o.title, date: o.updatedAt || o.createdAt, progress: o.achievementPercent || 0 });
     });
     if (recentActivity.decisions) {
       recentActivity.decisions.forEach(function (d) {
@@ -127,14 +131,13 @@ function Dashboard() {
     var fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000);
     return objArr.filter(function (o) {
       if (!['approved', 'validated'].includes(o.status)) return false;
-      if (o.goalStatus === 'achieved' || o.goalStatus === 'closed') return false;
+      if (o.achievementPercent >= 100) return false;
       var lastUpdated = new Date(o.updatedAt || o.createdAt);
       return lastUpdated < fourteenDaysAgo;
     });
   }
 
-  var heatmap = getHeatmapData();
-  var heatmapColors = { on_track: '#059669', at_risk: '#D97706', off_track: '#DC2626', achieved: '#7C3AED', no_status: '#9CA3AF', closed: '#6B7280' };
+
   var labels = getStatsLabels();
 
   var staleGoals = getNeedsAttentionGoals();
@@ -306,34 +309,15 @@ function Dashboard() {
         </div>
       )}
 
-      {/* Goal Heatmap */}
-      <div className="dash-heatmap">
-        <h3 className="dash-heatmap__title">🗺️ Goal Heatmap</h3>
-        <div className="dash-heatmap__grid">
-          {Object.entries(heatmap).map(function (entry) {
-            var key = entry[0]; var count = entry[1];
-            var color = heatmapColors[key] || '#9CA3AF';
-            var label = key.replace(/_/g, ' ').replace(/\b\w/g, function (l) { return l.toUpperCase(); });
-            return (
-              <div key={key} className="dash-heatmap__cell" style={{
-                background: color + '18', borderColor: color + '40', '--heatmap-color': color
-              }}>
-                <div className="dash-heatmap__count" style={{ color: color }}>{count}</div>
-                <div className="dash-heatmap__label" style={{ color: color }}>{label}</div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
+
 
       {/* Main Cards Grid */}
       <div className="dash-grid">
         <div className="dash-grid__col dash-grid__col--left">
           <MeetingCard />
-          <RecognitionCard />
         </div>
         <div className="dash-grid__col dash-grid__col--right">
-          <GoalCard objectives={objectives} loading={false} />
+          <GoalCard objectives={objectives} goalsList={goalsList} loading={false} />
           <TaskCard />
         </div>
       </div>
@@ -370,9 +354,7 @@ function Dashboard() {
 
       {/* Bottom Row */}
       <div className="dash-bottom-row">
-        <ReviewCard recentDecisions={recentActivity.decisions} />
         <FeedbackCard />
-        <SurveyCard />
       </div>
 
       {/* Performance section for ADMIN/HR */}

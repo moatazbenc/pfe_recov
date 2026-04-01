@@ -70,7 +70,7 @@ router.get('/', rateLimiter, auth, async function (req, res) {
             .populate('organizer', 'name email role')
             .populate('attendees', 'name email role')
             .populate('team', 'name')
-            .populate('relatedObjectives', 'title goalStatus')
+            .populate('relatedObjectives', 'title')
             .sort({ date: -1 });
 
         res.json({ success: true, count: meetings.length, meetings });
@@ -87,7 +87,7 @@ router.get('/:id', rateLimiter, auth, async function (req, res) {
             .populate('organizer', 'name email role')
             .populate('attendees', 'name email role')
             .populate('team', 'name')
-            .populate('relatedObjectives', 'title goalStatus achievementPercent')
+            .populate('relatedObjectives', 'title achievementPercent')
             .populate('agenda.presenter', 'name')
             .populate('actionItems.assignee', 'name email');
 
@@ -189,8 +189,7 @@ router.put('/:id', rateLimiter, auth, async function (req, res) {
         var populated = await Meeting.findById(meeting._id)
             .populate('organizer', 'name email role')
             .populate('attendees', 'name email role')
-            .populate('team', 'name')
-            .populate('relatedObjectives', 'title goalStatus');
+            .populate('relatedObjectives', 'title');
 
         // Send notifications (don't fail meeting update if notifications fail)
         try {

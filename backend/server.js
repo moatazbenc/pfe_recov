@@ -51,16 +51,14 @@ const routes = {
   '/api/meetings': './routes/meetings',
   '/api/ai': './routes/ai',
   '/api/feedback': './routes/feedback',
-  '/api/recognition': './routes/recognition',
   '/api/tasks': './routes/tasks',
-  '/api/surveys': './routes/surveys',
-  '/api/reviews': './routes/reviews',
   '/api/career': './routes/career',
   '/api/goals': './routes/goals',
   '/api/goal-reviews': './routes/goalReviews',
   '/api/performance': './routes/performance',
   '/api/dashboard': './routes/dashboard',
-  '/api/reports': './routes/reports'
+  '/api/reports': './routes/reports',
+  '/api/evaluations': './routes/evaluations'
 };
 
 Object.entries(routes).forEach(([routePath, modulePath]) => {

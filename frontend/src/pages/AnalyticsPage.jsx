@@ -8,7 +8,6 @@ var API = 'http://localhost:5000';
 var EMPTY_DASH = { objectives: 0, teams: 0, users: 0, cycles: 0 };
 var EMPTY_TASK = { total: 0, done: 0, inProgress: 0, overdue: 0, completionRate: 0 };
 var EMPTY_FEEDBACK = { received: 0, sent: 0, byType: [] };
-var EMPTY_RECOGNITION = { received: 0, sent: 0, totalPoints: 0 };
 
 function AnalyticsPage() {
   var { user } = useAuth();
@@ -17,7 +16,6 @@ function AnalyticsPage() {
   var [performance, setPerformance] = useState(null);
   var [taskStats, setTaskStats] = useState(EMPTY_TASK);
   var [feedbackStats, setFeedbackStats] = useState(EMPTY_FEEDBACK);
-  var [recognitionStats, setRecognitionStats] = useState(EMPTY_RECOGNITION);
 
   var token = localStorage.getItem('token');
   var headers = { Authorization: 'Bearer ' + token };
@@ -30,7 +28,6 @@ function AnalyticsPage() {
       axios.get(API + '/api/stats/dashboard', { headers: headers }).catch(function () { return null; }),
       axios.get(API + '/api/tasks/stats', { headers: headers }).catch(function () { return null; }),
       axios.get(API + '/api/feedback/stats', { headers: headers }).catch(function () { return null; }),
-      axios.get(API + '/api/recognition/stats', { headers: headers }).catch(function () { return null; }),
     ];
     if (user && (user.role === 'ADMIN' || user.role === 'HR')) {
       promises.push(axios.get(API + '/api/stats/performance', { headers: headers }).catch(function () { return null; }));
@@ -42,8 +39,7 @@ function AnalyticsPage() {
         if (res[0] && res[0].data) setDashStats(res[0].data);
         if (res[1] && res[1].data && res[1].data.stats) setTaskStats(res[1].data.stats);
         if (res[2] && res[2].data && res[2].data.stats) setFeedbackStats(res[2].data.stats);
-        if (res[3] && res[3].data && res[3].data.stats) setRecognitionStats(res[3].data.stats);
-        if (res[4] && res[4].data) setPerformance(res[4].data);
+        if (res[3] && res[3].data) setPerformance(res[3].data);
       })
       .catch(function () {
         // Final safety net — state keeps its safe defaults
@@ -59,7 +55,6 @@ function AnalyticsPage() {
   var dash = dashStats || EMPTY_DASH;
   var tasks = taskStats || EMPTY_TASK;
   var feedback = feedbackStats || EMPTY_FEEDBACK;
-  var recognition = recognitionStats || EMPTY_RECOGNITION;
 
   return (
     <div className="page-container">
@@ -106,16 +101,6 @@ function AnalyticsPage() {
             <div className="breakdown-list">{feedback.byType.map(function (t) { return <div key={t._id} className="breakdown-item"><span className="breakdown-item__label">{t._id}</span><span className="breakdown-item__value">{t.count}</span></div>; })}</div>
           </div>
         )}
-      </div>
-
-      {/* Recognition Analytics */}
-      <div className="analytics-section">
-        <h2 className="section-title">Recognition Analytics</h2>
-        <div className="stats-row">
-          <div className="mini-stat"><span className="mini-stat__value">{recognition.received || 0}</span><span className="mini-stat__label">Received</span></div>
-          <div className="mini-stat"><span className="mini-stat__value">{recognition.sent || 0}</span><span className="mini-stat__label">Given</span></div>
-          <div className="mini-stat mini-stat--purple"><span className="mini-stat__value">{recognition.totalPoints || 0}</span><span className="mini-stat__label">Total Points</span></div>
-        </div>
       </div>
 
       {/* Performance (Admin only) */}

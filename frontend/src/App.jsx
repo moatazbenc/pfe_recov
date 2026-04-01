@@ -17,10 +17,7 @@ import Settings from './pages/Settings';
 import GoalsPage from './pages/GoalsPage';
 import MeetingsPage from './pages/MeetingsPage';
 import FeedbackPage from './pages/FeedbackPage';
-import RecognitionPage from './pages/RecognitionPage';
 import TasksPage from './pages/TasksPage';
-import SurveysPage from './pages/SurveysPage';
-import ReviewsPage from './pages/ReviewsPage';
 import CareerPage from './pages/CareerPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import TeamFeed from './pages/TeamFeed';
@@ -32,6 +29,8 @@ import ManagerReviewsPage from './pages/ManagerReviewsPage';
 import MidYearPage from './pages/MidYearPage';
 import FinalEvaluationPage from './pages/FinalEvaluationPage';
 import PerformancePage from './pages/PerformancePage';
+import EvaluationScoringPage from './pages/EvaluationScoringPage';
+import EvaluationListPage from './pages/EvaluationListPage';
 import AdminDashboardPage from './pages/AdminDashboardPage';
 import AuditLogsPage from './pages/AuditLogsPage';
 // AI Assistant intentionally removed from the application
@@ -39,6 +38,7 @@ import AuditLogsPage from './pages/AuditLogsPage';
 import './App.css';
 import './premium.css';
 import './apple-design.css';
+import './evaluation.css';
 
 // Role-gated route: redirects to /dashboard if user lacks required role
 function RoleRoute({ allowedRoles, children }) {
@@ -64,6 +64,8 @@ function App() {
           <Route path="/midyear-assessments" element={<ProtectedRoute><DashboardLayout><MidYearPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/final-evaluations" element={<ProtectedRoute><DashboardLayout><FinalEvaluationPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/performance" element={<ProtectedRoute><DashboardLayout><PerformancePage /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/evaluation-list" element={<ProtectedRoute><DashboardLayout><EvaluationListPage /></DashboardLayout></ProtectedRoute>} />
+          <Route path="/evaluation-scoring" element={<ProtectedRoute><DashboardLayout><EvaluationScoringPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/admin-dashboard" element={<ProtectedRoute><DashboardLayout><RoleRoute allowedRoles={['ADMIN', 'HR']}><AdminDashboardPage /></RoleRoute></DashboardLayout></ProtectedRoute>} />
           <Route path="/audit-logs" element={<ProtectedRoute><DashboardLayout><RoleRoute allowedRoles={['ADMIN', 'HR']}><AuditLogsPage /></RoleRoute></DashboardLayout></ProtectedRoute>} />
           
@@ -86,10 +88,7 @@ function App() {
           <Route path="/settings" element={<ProtectedRoute><DashboardLayout><Settings /></DashboardLayout></ProtectedRoute>} />
           <Route path="/meetings" element={<ProtectedRoute><DashboardLayout><MeetingsPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/feedback" element={<ProtectedRoute><DashboardLayout><FeedbackPage /></DashboardLayout></ProtectedRoute>} />
-          <Route path="/recognition" element={<ProtectedRoute><DashboardLayout><RecognitionPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/tasks" element={<ProtectedRoute><DashboardLayout><TasksPage /></DashboardLayout></ProtectedRoute>} />
-          <Route path="/surveys" element={<ProtectedRoute><DashboardLayout><SurveysPage /></DashboardLayout></ProtectedRoute>} />
-          <Route path="/reviews" element={<ProtectedRoute><DashboardLayout><ReviewsPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/career" element={<ProtectedRoute><DashboardLayout><CareerPage /></DashboardLayout></ProtectedRoute>} />
           <Route path="/analytics" element={<ProtectedRoute><DashboardLayout><AnalyticsPage /></DashboardLayout></ProtectedRoute>} />
 

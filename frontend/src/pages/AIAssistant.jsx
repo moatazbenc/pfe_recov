@@ -6,7 +6,7 @@ import { useAuth } from '../components/AuthContext';
 function AIAssistant() {
     const { user } = useAuth();
     const [messages, setMessages] = useState([
-        { id: 1, role: 'assistant', text: `Hello ${user?.name}! I'm your AI Performance Assistant. How can I help you today? I can suggest goal improvements, generate feedback, or help you draft a progress update.` }
+        { id: 1, role: 'assistant', text: `Hi ${user?.name || 'there'}! 👋 I'm your AI Performance Assistant. I'm here to help you shine! Whether you need to brainstorm career goals, track your progress, or write a glowing performance update, just ask. What would you like to focus on today?` }
     ]);
     const [input, setInput] = useState('');
     const [loading, setLoading] = useState(false);
@@ -40,7 +40,7 @@ function AIAssistant() {
             setMessages(prev => [...prev, { 
                 id: Date.now() + 1, 
                 role: 'assistant', 
-                text: "Oops! Something went wrong while talking to the AI. Please try again later." 
+                text: "Oops! I encountered a small hiccup while thinking about that. Could you try asking me again?" 
             }]);
         } finally {
             setLoading(false);

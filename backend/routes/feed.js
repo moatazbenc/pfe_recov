@@ -32,7 +32,7 @@ router.get('/', auth, async (req, res) => {
                 user: obj.owner,
                 goalTitle: obj.title,
                 goalId: obj._id,
-                message: obj.goalStatus === 'no_status' ? 'updated the goal' : `changed status to ${obj.goalStatus}`,
+                message: 'updated the goal',
                 timestamp: obj.updatedAt
             });
 

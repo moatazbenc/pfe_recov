@@ -15,7 +15,6 @@ function CheckInModal({ goal, onClose, onCheckInComplete }) {
             unit: kpi.unit
         }))
     );
-    const [status, setStatus] = useState(goal.goalStatus || 'no_status');
     const [message, setMessage] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState('');
@@ -39,7 +38,6 @@ function CheckInModal({ goal, onClose, onCheckInComplete }) {
             
             await api.post(`/api/objectives/${goal._id}/progress`, {
                 message,
-                goalStatus: status,
                 kpiUpdates: payloadKpis
             });
             
@@ -60,20 +58,6 @@ function CheckInModal({ goal, onClose, onCheckInComplete }) {
                 {error && <div className="goal-modal__error">{error}</div>}
                 
                 <form className="goal-modal__form" onSubmit={handleSubmit}>
-                    
-                    {/* Status Update */}
-                    <div className="goal-modal__field">
-                        <label>Current Status</label>
-                        <select value={status} onChange={e => setStatus(e.target.value)} className="check-in-select">
-                            <option value="no_status">No Status</option>
-                            <option value="on_track">On Track</option>
-                            <option value="at_risk">At Risk</option>
-                            <option value="off_track">Off Track</option>
-                            {/* "completed" removed — not a valid goal status */}
-                            <option value="achieved">Achieved</option>
-                            <option value="closed">Closed</option>
-                        </select>
-                    </div>
 
                     {/* KPI Sliders */}
                     {kpiUpdates.length > 0 && (

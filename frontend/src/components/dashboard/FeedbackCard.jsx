@@ -36,7 +36,7 @@ function FeedbackCard() {
 
     useEffect(function() {
         if (showForm && users.length === 0) {
-            api.get('/api/users').then(res => setUsers(res.data.users || [])).catch(console.error);
+            api.get('/api/users/filter/list').then(res => setUsers(res.data.users || [])).catch(console.error);
         }
     }, [showForm, users.length]);
 

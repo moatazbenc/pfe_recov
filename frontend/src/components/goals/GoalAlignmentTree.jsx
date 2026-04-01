@@ -42,7 +42,6 @@ function GoalNode({ goal, level = 0 }) {
           <span className="goal-tree-title">{goal.title}</span>
           <div className="goal-tree-badges">
             <span className="goal-tree-weight">{goal.weight}%</span>
-            <GoalStatusBadge status={goal.goalStatus || 'no_status'} />
           </div>
         </div>
         <div className="goal-tree-card-bottom">
@@ -112,7 +111,6 @@ function GoalAlignmentTree({ rootGoal }) {
             <div className="goal-tree-card parent-card">
                <div className="goal-tree-card-top">
                 <span className="goal-tree-title">{parentGoal.title}</span>
-                <GoalStatusBadge status={parentGoal.goalStatus || 'no_status'} />
               </div>
               <div className="goal-tree-card-bottom">
                 <div className="goal-tree-owner" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>

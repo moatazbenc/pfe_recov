@@ -134,14 +134,6 @@ const ObjectiveSchema = new mongoose.Schema({
   validatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', default: null },
   validatedAt: { type: Date, default: null },
 
-  // === EXECUTION STATUS (goalStatus) ===
-  goalStatus: {
-    type: String,
-    enum: ['no_status', 'not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'on_hold', 'closed', 'achieved'],
-    default: 'no_status',
-    index: true,
-  },
-
   startDate: { type: Date, default: null },
   labels: [{ type: String, trim: true }],
   visibility: {
@@ -169,7 +161,6 @@ ObjectiveSchema.index({ owner: 1, status: 1 });
 ObjectiveSchema.index({ owner: 1, cycle: 1 });
 ObjectiveSchema.index({ status: 1 });
 ObjectiveSchema.index({ category: 1 });
-ObjectiveSchema.index({ goalStatus: 1 });
 ObjectiveSchema.index({ source: 1 });
 
 module.exports = mongoose.model('Objective', ObjectiveSchema);

@@ -13,7 +13,7 @@ function Cycles() {
   const [showModal, setShowModal] = useState(false);
   const [editingCycle, setEditingCycle] = useState(null);
   const [confirmPhaseStart, setConfirmPhaseStart] = useState(null);
-  const [confirmDelete, setConfirmDelete] = useState(null);
+
 
   const [formData, setFormData] = useState({
     name: '',
@@ -92,15 +92,13 @@ function Cycles() {
     }
   }
 
-  async function handleDeleteConfirm() {
+  async function handleDelete(cycle) {
     try {
-      await api.delete(`/api/cycles/${confirmDelete._id}`);
+      await api.delete(`/api/cycles/${cycle._id}`);
       toast.success('Cycle deleted successfully!');
-      setConfirmDelete(null);
       fetchCycles();
     } catch (err) {
       toast.error(err.response?.data?.message || 'Failed to delete cycle');
-      setConfirmDelete(null);
     }
   }
 
@@ -197,8 +195,8 @@ function Cycles() {
               {(user.role === 'ADMIN' || user.role === 'HR') && (
                 <div style={{ display:'flex', gap:'0.5rem', borderTop:'1px solid var(--border-color)', paddingTop:'1rem' }}>
                   <button className="btn btn--outline btn--sm" style={{ flex: 1 }} onClick={() => openEditModal(cycle)}>✏️ Edit</button>
-                  {(user.role === 'ADMIN' || cycle.status === 'draft') && (
-                    <button className="btn btn--outline btn--sm" style={{ color:'var(--danger)', borderColor:'var(--danger)' }} onClick={() => setConfirmDelete(cycle)}>🗑️ Delete</button>
+                  {user.role === 'ADMIN' && (
+                    <button className="btn btn--outline btn--sm" style={{ color:'var(--danger)', borderColor:'var(--danger)' }} onClick={() => handleDelete(cycle)}>🗑️ Delete</button>
                   )}
                   {cycle.status !== 'closed' && (
                     <button className="btn btn--primary btn--sm" style={{ flex: 2 }} onClick={() => setConfirmPhaseStart(cycle)}>
@@ -297,15 +295,7 @@ function Cycles() {
       )}
 
       {/* CONFIRMATION DIALOGS */}
-      <ConfirmDialog 
-        open={!!confirmDelete} 
-        title="Delete Cycle" 
-        message={`Are you sure you want to delete ${confirmDelete?.name}? All goals attached to this cycle will be orphaned. This cannot be undone.`} 
-        danger={true} 
-        confirmLabel="Delete" 
-        onConfirm={handleDeleteConfirm} 
-        onCancel={() => setConfirmDelete(null)} 
-      />
+
 
       {confirmPhaseStart && (() => {
         const cycle = confirmPhaseStart;

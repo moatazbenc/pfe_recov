@@ -151,6 +151,11 @@ export const useToast = () => {
     showError,
     showWarning,
     showInfo,
+    // Shorthand aliases (toast.success / toast.error / etc.)
+    success: showSuccess,
+    error: showError,
+    warning: showWarning,
+    info: showInfo,
   };
 };
 

@@ -36,6 +36,7 @@ function Sidebar({ collapsed, setCollapsed }) {
                 { path: '/goal-approvals', label: 'Goal Approvals', icon: '📋', roles: ['ADMIN', 'HR', 'TEAM_LEADER', 'MANAGER'] },
                 { path: '/midyear-assessments', label: 'Mid-Year (P2)', icon: '⚖️', roles: null },
                 { path: '/final-evaluations', label: 'End-Year (P3)', icon: '📝', roles: null },
+                { path: '/evaluation-list', label: 'Evaluations', icon: '⭐', roles: null },
                 { path: '/performance', label: 'Performance', icon: '🏆', roles: null },
             ],
         },
@@ -44,9 +45,6 @@ function Sidebar({ collapsed, setCollapsed }) {
             items: [
                 { path: '/my-team', label: 'Team Dashboard', icon: '👥', roles: null },
                 { path: '/feedback', label: 'Feedback', icon: '💬', roles: null },
-                { path: '/recognition', label: 'Recognition', icon: '🌟', roles: null },
-                { path: '/reviews', label: 'Reviews', icon: '📋', roles: null },
-                { path: '/surveys', label: 'Surveys', icon: '📊', roles: null },
             ],
         },
         {

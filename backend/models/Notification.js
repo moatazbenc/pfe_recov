@@ -20,7 +20,9 @@ const notificationSchema = new mongoose.Schema({
             'MEETING_INVITE', 'MEETING_UPDATE',
             'MIDYEAR_REVIEW_COMPLETED', 'FINAL_EVALUATION_COMPLETED',
             'PHASE_OPENED', 'PHASE_CLOSED',
-            'DEADLINE_REMINDER', 'OVERDUE_ALERT'
+            'DEADLINE_REMINDER', 'OVERDUE_ALERT',
+            'EVALUATION_CREATED', 'EVALUATION_SUBMITTED', 'EVALUATION_APPROVED',
+            'EVALUATION_REJECTED', 'EVALUATION_COMPLETED'
         ],
         required: true
     },

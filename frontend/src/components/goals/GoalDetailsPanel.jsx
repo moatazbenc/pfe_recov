@@ -17,7 +17,6 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
     var [detail, setDetail] = useState(goal);
     var [kpiForm, setKpiForm] = useState({ title: '', metricType: 'percent', initialValue: 0, targetValue: 100, currentValue: 0, unit: '' });
     var [showKpiForm, setShowKpiForm] = useState(false);
-    var [newStatus, setNewStatus] = useState(goal.goalStatus || 'no_status');
     var [children, setChildren] = useState([]);
     var [showCheckInModal, setShowCheckInModal] = useState(false);
     var [showChangeRequestModal, setShowChangeRequestModal] = useState(false);
@@ -43,7 +42,7 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
     }
 
     var isAssigned = detail.status === 'assigned';
-    var isCompleted = detail.goalStatus === 'achieved' || detail.goalStatus === 'closed';
+    var isCompleted = detail.achievementPercent >= 100;
 
     useEffect(function () { fetchDetail(); fetchChildren(); }, [goal._id]);
     useEffect(function () {
@@ -86,13 +85,6 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
         } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     }
 
-    async function handleStatusChange() {
-        try {
-            await api.put('/api/objectives/' + goal._id + '/goal-status', { goalStatus: newStatus });
-            toast.success('Status updated!');
-            fetchDetail(); if (onRefresh) onRefresh();
-        } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
-    }
 
     async function handleAddKpi(e) {
         e.preventDefault();
@@ -132,7 +124,7 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
     async function handleCreateSubGoal(e) {
         e.preventDefault();
         try {
-            await api.post('/api/objectives', { title: subGoalForm.title, weight: parseInt(subGoalForm.weight) || 10, deadline: subGoalForm.deadline || undefined, cycle: detail.cycle?._id || detail.cycle, category: detail.category || 'individual', successIndicator: subGoalForm.title, parentObjective: goal._id, goalStatus: 'no_status' });
+            await api.post('/api/objectives', { title: subGoalForm.title, weight: parseInt(subGoalForm.weight) || 10, deadline: subGoalForm.deadline || undefined, cycle: detail.cycle?._id || detail.cycle, category: detail.category || 'individual', successIndicator: subGoalForm.title, parentObjective: goal._id });
             setSubGoalForm({ title: '', weight: 10, deadline: '' }); setShowSubGoalForm(false); toast.success('Sub-goal created!'); fetchChildren(); if (onRefresh) onRefresh();
         } catch (err) { toast.error(err.response?.data?.message || 'Failed'); }
     }
@@ -153,7 +145,7 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
     function formatDate(d) { return d ? new Date(d).toLocaleDateString() : '—'; }
     function formatDateTime(d) { return d ? new Date(d).toLocaleString() : '—'; }
 
-    var tabs = ['details', 'kpis', 'alignment', 'updates', 'comments', 'activity', 'settings'];
+    var tabs = ['details', 'kpis', 'alignment', 'updates', 'comments', 'activity'];
     if (detail.changeRequests && detail.changeRequests.length > 0) tabs.splice(5, 0, 'changes');
 
     var ratingLabels = { exceeded: '🌟 Exceeded Expectations', met: '✅ Met Expectations', partially_met: '⚡ Partially Met', not_met: '❌ Did Not Meet' };
@@ -264,7 +256,6 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
                             <GoalProgressBar percent={detail.achievementPercent || 0} />
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', alignItems: 'flex-end' }}>
-                            <GoalStatusBadge status={detail.goalStatus || 'no_status'} />
                             <GoalStatusBadge status={detail.status} type="workflow" />
                         </div>
                     </div>
@@ -336,7 +327,6 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
                                         <div key={cr._id} style={{ background: 'var(--bg-main,#f8fafc)', border: '1px solid var(--border-color)', borderRadius: '10px', padding: '1rem', marginBottom: '0.75rem' }}>
                                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                                                 <strong>{typeLabels[cr.requestType] || cr.requestType}</strong>
-                                                <GoalStatusBadge status={cr.status === 'pending' ? 'at_risk' : cr.status === 'approved' ? 'on_track' : 'off_track'} />
                                             </div>
                                             <p style={{ margin: '4px 0', fontSize: '0.9rem' }}>{cr.reason}</p>
                                             {cr.newDeadline && <p style={{ margin: '2px 0', fontSize: '0.85rem', color: '#64748b' }}>New deadline: {formatDate(cr.newDeadline)}</p>}
@@ -373,26 +363,6 @@ function GoalDetailsPanel({ goal, onClose, onRefresh }) {
                         </div>
                     )}
 
-                    {activeTab === 'settings' && (
-                        <div className="goal-panel__settings">
-                            <h3>Goal Settings</h3>
-                            <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-                                <label>Execution Status:</label>
-                                <select value={newStatus} onChange={function (e) { setNewStatus(e.target.value); }} style={{ flex: 1 }}>
-                                    <option value="no_status">No Status</option>
-                                    <option value="not_started">Not Started</option>
-                                    <option value="in_progress">In Progress</option>
-                                    <option value="on_track">On Track</option>
-                                    <option value="at_risk">At Risk</option>
-                                    <option value="off_track">Off Track</option>
-                                    <option value="on_hold">On Hold</option>
-                                    <option value="closed">Closed</option>
-                                    <option value="achieved">Achieved</option>
-                                </select>
-                                <button className="btn btn--primary btn--sm" onClick={handleStatusChange}>Save</button>
-                            </div>
-                        </div>
-                    )}
                 </div>
             </div>
 

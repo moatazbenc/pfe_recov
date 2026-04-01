@@ -199,8 +199,13 @@ exports.summarizePerformance = async (req, res) => {
         // Build contextual insights from actual data
         var contextParts = [];
         if (objectives && objectives.length > 0) {
-            var completed = objectives.filter(function (o) { return o.goalStatus === 'achieved' || o.achievementPercent >= 100; }).length;
-            var atRisk = objectives.filter(function (o) { return o.goalStatus === 'at_risk' || o.goalStatus === 'off_track'; }).length;
+            // Completed if achievementPercent >= 100
+            var completed = objectives.filter(function (o) { return o.achievementPercent >= 100; }).length;
+            // At risk if overdue or progressing slowly
+            var atRisk = objectives.filter(function (o) { 
+                if (!o.deadline) return false;
+                return new Date(o.deadline) < new Date() && o.achievementPercent < 100;
+            }).length;
             var avgProgress = objectives.reduce(function (sum, o) { return sum + (o.achievementPercent || 0); }, 0) / objectives.length;
 
             if (completed > 0) contextParts.push(completed + ' out of ' + objCount + ' objectives have been achieved.');

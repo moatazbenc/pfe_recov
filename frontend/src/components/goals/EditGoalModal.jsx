@@ -16,7 +16,6 @@ function EditGoalModal({ goal, onClose, onUpdated, cycles, parentGoals, existing
         labels: (goal.labels || []).join(', '),
         visibility: goal.visibility || 'public',
         parentObjective: goal.parentObjective?._id || goal.parentObjective || '',
-        goalStatus: goal.goalStatus || 'no_status',
     });
     var [error, setError] = useState('');
     var [loading, setLoading] = useState(false);
@@ -62,7 +61,6 @@ function EditGoalModal({ goal, onClose, onUpdated, cycles, parentGoals, existing
                 labels: form.labels ? form.labels.split(',').map(function (l) { return l.trim(); }).filter(Boolean) : [],
                 visibility: form.visibility,
                 parentObjective: form.parentObjective || null,
-                goalStatus: form.goalStatus,
             };
             await api.put('/api/objectives/' + goal._id, payload);
             if (onUpdated) onUpdated();
@@ -124,23 +122,12 @@ function EditGoalModal({ goal, onClose, onUpdated, cycles, parentGoals, existing
                         <textarea value={form.successIndicator} onChange={function (e) { handleChange('successIndicator', e.target.value); }} rows={2}></textarea>
                     </div>
 
-                    <div className="goal-modal__row">
-                        <div className="goal-modal__field">
-                            <label>Cycle *</label>
-                            <select value={form.cycle} onChange={function (e) { handleChange('cycle', e.target.value); }} required>
-                                <option value="">Select Cycle</option>
-                                {cycles && cycles.map(function (c) { return <option key={c._id} value={c._id}>{c.name} ({c.year})</option>; })}
-                            </select>
-                        </div>
-                        <div className="goal-modal__field">
-                            <label>Status</label>
-                            <select value={form.goalStatus} onChange={function (e) { handleChange('goalStatus', e.target.value); }}>
-                                <option value="no_status">No Status</option>
-                                <option value="on_track">On Track</option>
-                                <option value="at_risk">At Risk</option>
-                                <option value="off_track">Off Track</option>
-                            </select>
-                        </div>
+                    <div className="goal-modal__field">
+                        <label>Cycle *</label>
+                        <select value={form.cycle} onChange={function (e) { handleChange('cycle', e.target.value); }} required>
+                            <option value="">Select Cycle</option>
+                            {cycles && cycles.map(function (c) { return <option key={c._id} value={c._id}>{c.name} ({c.year})</option>; })}
+                        </select>
                     </div>
 
                     <div className="goal-modal__row">

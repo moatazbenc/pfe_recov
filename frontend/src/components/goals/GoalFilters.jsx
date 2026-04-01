@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../AuthContext';
 
-function GoalFilters({ activeTab, onTabChange, cycles, selectedCycle, onCycleChange, searchTerm, onSearchChange, workflowFilter, onWorkflowFilter }) {
+function GoalFilters({ activeTab, onTabChange, cycles, selectedCycle, onCycleChange, searchTerm, onSearchChange }) {
     var { user } = useAuth();
     var isManager = user && (user.role === 'TEAM_LEADER' || user.role === 'ADMIN' || user.role === 'HR');
 
@@ -16,18 +16,6 @@ function GoalFilters({ activeTab, onTabChange, cycles, selectedCycle, onCycleCha
     }
     tabs.push({ key: 'all', label: '🌐 All Goals' });
 
-    var workflowStatuses = [
-        { key: 'all', label: 'All Statuses' },
-        { key: 'draft', label: 'Draft' },
-        { key: 'pending', label: 'Pending (Submitted)' },
-        { key: 'pending_approval', label: 'Pending Approval' },
-        { key: 'revision_requested', label: 'Revision Requested' },
-        { key: 'rejected', label: 'Rejected' },
-        { key: 'assigned', label: 'Assigned' },
-        { key: 'approved', label: 'Approved / Active' },
-        { key: 'evaluated', label: 'Evaluated' },
-        { key: 'archived', label: 'Archived' },
-    ];
 
     return (
         <div className="goals-filters">
@@ -54,17 +42,7 @@ function GoalFilters({ activeTab, onTabChange, cycles, selectedCycle, onCycleCha
                     className="goals-filters__search"
                     style={{ padding: '8px 12px', borderRadius: '6px', border: '1px solid #cbd5e1', outline: 'none' }}
                 />
-                {onWorkflowFilter && (
-                    <select
-                        className="goals-filters__cycle-select"
-                        value={workflowFilter || 'all'}
-                        onChange={function (e) { onWorkflowFilter(e.target.value === 'all' ? null : e.target.value); }}
-                    >
-                        {workflowStatuses.map(function (s) {
-                            return <option key={s.key} value={s.key}>{s.label}</option>;
-                        })}
-                    </select>
-                )}
+
                 <select
                     className="goals-filters__cycle-select"
                     value={selectedCycle}

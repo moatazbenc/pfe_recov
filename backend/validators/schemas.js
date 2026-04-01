@@ -49,7 +49,6 @@ const schemas = {
             visibility: Joi.string().valid('private', 'team', 'department', 'public').default('public'),
             startDate: Joi.date().iso().allow(null, ''),
             parentObjective: objectId.allow(null, ''),
-            goalStatus: Joi.string().valid('no_status', 'not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'on_hold', 'closed', 'achieved').default('no_status'),
             targetUser: objectId.allow(null, ''),
             targetTeam: objectId.allow(null, ''),
         }),
@@ -63,7 +62,6 @@ const schemas = {
             visibility: Joi.string().valid('private', 'team', 'department', 'public'),
             startDate: Joi.date().iso().allow(null, ''),
             parentObjective: objectId.allow(null, ''),
-            goalStatus: Joi.string().valid('no_status', 'not_started', 'in_progress', 'on_track', 'at_risk', 'off_track', 'on_hold', 'closed', 'achieved'),
         }),
         submitProgress: Joi.object({
             achievementPercent: Joi.number().integer().min(0).max(100).required(),
